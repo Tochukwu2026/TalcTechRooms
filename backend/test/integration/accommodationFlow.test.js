@@ -75,16 +75,33 @@ test('An approved renter can create, read, update and deactivate a listing', asy
   const create = await request(app)
     .post('/accommodations')
     .set('Authorization', `Bearer ${token}`)
-    .send({ ...validPayload, amenities: ['Wi-Fi', 'Air Conditioning'], images: ['https://example.com/a.jpg'] });
+    .send({ ...validPayload, amenities: ['Wi-Fi', 'Air Conditioning'] });
   assert.equal(create.status, 201);
   assert.equal(create.body.state, 'Lagos');
   assert.equal(create.body.area, 'Lekki');
   assert.equal(Number(create.body.nightly_rent_naira), 25000);
   assert.equal(create.body.units_available, 3);
   assert.equal(create.body.amenities.length, 2);
-  assert.equal(create.body.images.length, 1);
+  assert.equal(create.body.images.length, 0);
 
   const id = create.body.id;
+
+  // Two-step image upload: request a signed URL, then confirm the object exists.
+  const uploadUrlRes = await request(app)
+    .post(`/accommodations/${id}/images/upload-url`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ contentType: 'image/jpeg' });
+  assert.equal(uploadUrlRes.status, 201);
+  assert.ok(uploadUrlRes.body.uploadUrl);
+  assert.ok(uploadUrlRes.body.objectPath.startsWith(`accommodations/${id}/`));
+
+  const confirmRes = await request(app)
+    .post(`/accommodations/${id}/images`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ objectPath: uploadUrlRes.body.objectPath });
+  assert.equal(confirmRes.status, 201);
+  assert.equal(confirmRes.body.images.length, 1);
+  assert.equal(confirmRes.body.images[0].url, uploadUrlRes.body.publicUrl);
 
   // Public view hides contact_info.
   const publicView = await request(app).get(`/accommodations/${id}`);

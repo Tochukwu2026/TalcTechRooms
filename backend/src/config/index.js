@@ -18,6 +18,20 @@ const config = {
     expiresIn: required('JWT_EXPIRES_IN', '7d'),
   },
 
+  storage: {
+    // 'mock' simulates uploads with no real bucket, so the rest of the app can be built and
+    // tested before a real GCP project/bucket exists - see src/modules/storage.
+    mode: required('STORAGE_MODE', 'mock'),
+    gcs: {
+      bucketName: process.env.GCS_BUCKET_NAME || '',
+      projectId: process.env.GCS_PROJECT_ID || '',
+      // publicBaseUrl lets you front the bucket with a CDN/custom domain later; defaults to
+      // the bucket's plain public URL, which requires the bucket to be configured for public
+      // read (or you serve images through signed read URLs instead - not yet built).
+      publicBaseUrl: process.env.GCS_PUBLIC_BASE_URL || '',
+    },
+  },
+
   idVerification: {
     // 'mock' returns deterministic fake results so the rest of the app can be built/tested
     // before real Prembly credentials exist. Switch to 'prembly' once PREMBLY_APP_ID /

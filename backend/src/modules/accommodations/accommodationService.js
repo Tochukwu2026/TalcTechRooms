@@ -1,5 +1,6 @@
 const { pool, withTransaction } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
+const storage = require('../storage');
 
 /**
  * Looks up the price_cap_id for a given {state, area}. area is required for Lagos and must
@@ -87,9 +88,10 @@ async function createAccommodation(renterUserId, input) {
     if (input.amenities && input.amenities.length > 0) {
       await setAmenities(client, accommodationId, input.amenities);
     }
-    if (input.images && input.images.length > 0) {
-      await addImages(client, accommodationId, input.images);
-    }
+    // Images are attached in a separate step (request an upload URL, upload the bytes
+    // directly to storage, then confirm) - see requestImageUploadUrl/confirmAccommodationImage
+    // below. They can't be attached at creation time because the object-path namespace is
+    // scoped to the accommodation's id, which doesn't exist until this INSERT completes.
 
     return getAccommodationForOwner(accommodationId, renterUserId, client);
   });
@@ -275,25 +277,54 @@ async function replaceAmenities(accommodationId, renterUserId, amenityNames) {
   });
 }
 
-async function addImages(client, accommodationId, urls) {
-  const { rows: existing } = await client.query(
-    'SELECT COALESCE(MAX(position), -1) AS max_position FROM accommodation_images WHERE accommodation_id = $1',
-    [accommodationId]
-  );
-  let position = existing[0].max_position + 1;
-  for (const url of urls) {
-    await client.query(
-      'INSERT INTO accommodation_images (accommodation_id, url, position) VALUES ($1, $2, $3)',
-      [accommodationId, url, position]
-    );
-    position += 1;
-  }
-}
-
-async function addAccommodationImages(accommodationId, renterUserId, urls) {
+/**
+ * Step 1 of attaching an image: mint a namespaced object path + a short-lived signed URL the
+ * Renter's device can PUT the file's bytes to directly (never routed through this server).
+ * Nothing is written to the database yet - that happens in confirmAccommodationImage below,
+ * once the upload has actually happened.
+ */
+async function requestImageUploadUrl(accommodationId, renterUserId, contentType) {
   return withTransaction(async (client) => {
     await assertOwnsAccommodation(client, accommodationId, renterUserId);
-    await addImages(client, accommodationId, urls);
+    const objectPath = storage.generateObjectPath(accommodationId, contentType);
+    const { uploadUrl, expiresInSeconds } = await storage.getUploadUrl(objectPath, contentType);
+    return { uploadUrl, objectPath, publicUrl: storage.publicUrl(objectPath), expiresInSeconds };
+  });
+}
+
+/**
+ * Step 2: the Renter's device has PUT the bytes to `objectPath` using the signed URL from
+ * step 1; this confirms it (via storage.confirmObjectExists - see each provider's caveats
+ * about how strong that check actually is) and attaches it to the listing.
+ */
+async function confirmAccommodationImage(accommodationId, renterUserId, objectPath) {
+  return withTransaction(async (client) => {
+    await assertOwnsAccommodation(client, accommodationId, renterUserId);
+
+    const expectedPrefix = `accommodations/${accommodationId}/`;
+    if (!objectPath.startsWith(expectedPrefix)) {
+      throw new ApiError(400, 'This object path was not issued for this accommodation.');
+    }
+
+    const exists = await storage.confirmObjectExists(objectPath);
+    if (!exists) {
+      throw new ApiError(
+        422,
+        'No uploaded file was found at that path yet. Upload to the signed URL first, then confirm.'
+      );
+    }
+
+    const { rows: existing } = await client.query(
+      'SELECT COALESCE(MAX(position), -1) AS max_position FROM accommodation_images WHERE accommodation_id = $1',
+      [accommodationId]
+    );
+    const position = existing[0].max_position + 1;
+
+    await client.query(
+      'INSERT INTO accommodation_images (accommodation_id, url, object_path, position) VALUES ($1, $2, $3, $4)',
+      [accommodationId, storage.publicUrl(objectPath), objectPath, position]
+    );
+
     return getAccommodationForOwner(accommodationId, renterUserId, client);
   });
 }
@@ -301,12 +332,15 @@ async function addAccommodationImages(accommodationId, renterUserId, urls) {
 async function removeAccommodationImage(accommodationId, renterUserId, imageId) {
   return withTransaction(async (client) => {
     await assertOwnsAccommodation(client, accommodationId, renterUserId);
-    const { rowCount } = await client.query(
-      'DELETE FROM accommodation_images WHERE id = $1 AND accommodation_id = $2',
+    const { rows } = await client.query(
+      'DELETE FROM accommodation_images WHERE id = $1 AND accommodation_id = $2 RETURNING object_path',
       [imageId, accommodationId]
     );
-    if (rowCount === 0) {
+    if (rows.length === 0) {
       throw new ApiError(404, 'Image not found on this accommodation.');
+    }
+    if (rows[0].object_path) {
+      await storage.deleteObject(rows[0].object_path);
     }
     return getAccommodationForOwner(accommodationId, renterUserId, client);
   });
@@ -393,7 +427,8 @@ module.exports = {
   getAccommodationForOwner,
   getAccommodationPublic,
   replaceAmenities,
-  addAccommodationImages,
+  requestImageUploadUrl,
+  confirmAccommodationImage,
   removeAccommodationImage,
   setViewingAvailability,
   removeViewingAvailability,

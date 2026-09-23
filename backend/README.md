@@ -19,21 +19,41 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
 - Customer registration: instant/automatic activation once ID verification passes, no manual
   review queue.
 - Admin endpoints to list/approve/reject pending renters.
-- **Accommodation listing CRUD** (added 2026-09-23): approved Renters can create, list, read,
-  update, deactivate/reactivate their own listings; tag amenities; attach image URLs (see
-  caveat below - no file upload yet, URLs only); mark/unmark the 30-day Live Viewing
-  availability calendar. Public endpoints list price caps and amenities (for building
+- **Accommodation listing CRUD**: approved Renters can create, list, read, update,
+  deactivate/reactivate their own listings; tag amenities; mark/unmark the 30-day Live
+  Viewing availability calendar. Public endpoints list price caps and amenities (for building
   location/amenity pickers) and read a single active listing with `contact_info` withheld
   until checkout exists (spec/requirements-v1.md > Renter Account & Flow). Creating or
   editing a listing's location re-runs the Price Cap check via the same DB trigger used at
   the schema level.
+- **Accommodation image uploads** (added 2026-09-23): real file storage via a provider-agnostic
+  interface (`src/modules/storage`), `mock` mode by default. Images go through a two-step
+  direct-to-storage flow, not through this server:
+  1. `POST /accommodations/:id/images/upload-url` with `{ contentType }` returns a short-lived
+     signed URL (`uploadUrl`) plus the `objectPath` it was issued for.
+  2. The Renter's device `PUT`s the file's bytes straight to `uploadUrl`.
+  3. `POST /accommodations/:id/images` with `{ objectPath }` confirms the object exists and
+     attaches it to the listing.
+  `DELETE /accommodations/:id/images/:imageId` best-effort deletes the underlying object too.
+  `STORAGE_MODE=gcs` switches to real Google Cloud Storage (v4 signed URLs) - **this has not
+  been tested against a real GCP project/bucket**; read the caveat at the top of
+  `src/modules/storage/gcsProvider.js` before pointing a real environment at it.
+- Fixed a real data bug found while testing the above: the `price_caps` table's original
+  `UNIQUE (state, area)` constraint didn't dedupe rows where `area IS NULL` (Postgres treats
+  each `NULL` as distinct for uniqueness), so re-running the seed script silently duplicated
+  the 11 flat-cap states. Migration `0009_price_caps_dedupe_null_area` de-duplicates existing
+  rows and replaces the constraint with a `(state, COALESCE(area, ''))` unique index; the seed
+  script's `ON CONFLICT` clause was updated to match. Verified idempotent: running
+  `npm run seed` twice now yields exactly 22 rows, not 33.
 - 21 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
 `src/modules/accommodations/accommodationService.js` for the full reasoning):
-- Images are stored as plain URLs the Renter supplies - there's no file-upload-to-cloud-storage
-  endpoint yet (no storage provider has been chosen). Revisit once one is.
+- In `mock` storage mode, `confirmObjectExists()` always returns `true` - there's no real
+  object to check for, so confirming an image never actually verifies an upload happened; it
+  trusts the client. Fine for local development; not a substitute for testing the real GCS
+  provider before launch.
 - Editing `numberOfUnits` resets `unitsAvailable` to match it. Fine while no booking flow
   exists yet to be holding units against active bookings - revisit once bookings exist, so an
   in-progress booking's held units aren't silently overwritten by an edit.
@@ -86,6 +106,20 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
   `PREMBLY_API_KEY` in `.env`. **This has not been tested against real credentials** - read the
   caveat at the top of `src/modules/idVerification/premblyProvider.js` before switching a real
   environment over to it.
+
+## Image storage: mock vs. real Google Cloud Storage
+
+`STORAGE_MODE` in `.env` controls which provider `src/modules/storage` uses:
+
+- `mock` (default): no real bucket, no network call, no bytes actually stored anywhere. Lets
+  the upload endpoints be built and tested before a real GCP project/bucket exists.
+- `gcs`: real Google Cloud Storage, using v4 signed URLs so the client uploads directly to the
+  bucket. Requires `GCS_BUCKET_NAME` and `GCS_PROJECT_ID` in `.env`, and Application Default
+  Credentials for a service account with permission to sign URLs for that bucket (see
+  `GOOGLE_APPLICATION_CREDENTIALS` in `.env.example`). Optionally set `GCS_PUBLIC_BASE_URL` if
+  the bucket is fronted by a CDN/custom domain. **This has not been tested against a real
+  bucket/service account** - read the caveat at the top of `src/modules/storage/gcsProvider.js`
+  before switching a real environment over to it.
 
 ## Project layout
 

@@ -12,7 +12,9 @@ INSERT INTO price_caps (state, area, cap_naira) VALUES
   ('Imo', NULL, 20000),
   ('Abia', NULL, 20000),
   ('Bayelsa', NULL, 20000)
-ON CONFLICT (state, area) DO NOTHING;
+-- Matches the price_caps_state_area_coalesced_key index (src/db/migrations/0009_*), which
+-- treats area = NULL consistently, unlike a plain UNIQUE (state, area) constraint.
+ON CONFLICT (state, (COALESCE(area, ''))) DO NOTHING;
 
 -- Lagos - by named area, not one flat state cap. A Lagos accommodation MUST reference one
 -- of these 11 rows; any other Lagos area is deliberately not seeded here, which is what
@@ -29,4 +31,4 @@ INSERT INTO price_caps (state, area, cap_naira) VALUES
   ('Lagos', 'Ikoyi/Dolphin Estate/Awolowo Road Area', 25000),
   ('Lagos', 'Alaba/Mile 2 Area', 20000),
   ('Lagos', 'Apapa', 20000)
-ON CONFLICT (state, area) DO NOTHING;
+ON CONFLICT (state, (COALESCE(area, ''))) DO NOTHING;

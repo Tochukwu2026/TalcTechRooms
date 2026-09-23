@@ -50,7 +50,6 @@ const createAccommodationSchema = z.object({
   numberOfUnits: z.number().int().positive().max(1000),
   nightlyRentNaira: z.number().positive().max(10000000),
   amenities: z.array(z.string().min(1).max(100)).max(50).optional(),
-  images: z.array(z.string().url()).max(30).optional(),
 });
 
 const updateAccommodationSchema = z.object({
@@ -68,8 +67,13 @@ const amenitiesSchema = z.object({
   amenities: z.array(z.string().min(1).max(100)).max(50),
 });
 
-const imagesSchema = z.object({
-  images: z.array(z.string().url()).min(1).max(30),
+// Keep in sync with storage.ALLOWED_IMAGE_CONTENT_TYPES (src/modules/storage/index.js).
+const requestImageUploadUrlSchema = z.object({
+  contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+});
+
+const confirmImageSchema = z.object({
+  objectPath: z.string().min(1).max(500),
 });
 
 const viewingAvailabilitySchema = z.object({
@@ -97,7 +101,8 @@ module.exports = {
   createAccommodationSchema,
   updateAccommodationSchema,
   amenitiesSchema,
-  imagesSchema,
+  requestImageUploadUrlSchema,
+  confirmImageSchema,
   viewingAvailabilitySchema,
   validateBody,
 };

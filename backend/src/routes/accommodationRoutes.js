@@ -5,7 +5,8 @@ const {
   createAccommodationSchema,
   updateAccommodationSchema,
   amenitiesSchema,
-  imagesSchema,
+  requestImageUploadUrlSchema,
+  confirmImageSchema,
   viewingAvailabilitySchema,
   validateBody,
 } = require('./validation');
@@ -112,14 +113,29 @@ router.put(
   })
 );
 
+// Two-step upload: 1) ask for a signed URL and PUT the file bytes directly to storage,
+// 2) confirm the object exists so it gets attached to the listing.
 router.post(
-  '/:id/images',
-  validateBody(imagesSchema),
+  '/:id/images/upload-url',
+  validateBody(requestImageUploadUrlSchema),
   asyncHandler(async (req, res) => {
-    const accommodation = await accommodationService.addAccommodationImages(
+    const result = await accommodationService.requestImageUploadUrl(
       Number(req.params.id),
       req.user.id,
-      req.body.images
+      req.body.contentType
+    );
+    res.status(201).json(result);
+  })
+);
+
+router.post(
+  '/:id/images',
+  validateBody(confirmImageSchema),
+  asyncHandler(async (req, res) => {
+    const accommodation = await accommodationService.confirmAccommodationImage(
+      Number(req.params.id),
+      req.user.id,
+      req.body.objectPath
     );
     res.status(201).json(accommodation);
   })
