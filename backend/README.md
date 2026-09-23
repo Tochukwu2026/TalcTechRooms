@@ -6,8 +6,7 @@ spec and confirmed business decisions this code implements.
 
 ## Status (2026-09-23)
 
-Built and verified in this session, against a real local PostgreSQL instance (not just
-syntax-checked):
+Built and verified against a real local PostgreSQL instance (not just syntax-checked):
 
 - Full Phase 1 SQL schema as up/down migrations (`src/db/migrations`), applied and rolled
   back successfully, including the Price Cap enforcement trigger and the Lagos-area-only
@@ -20,15 +19,31 @@ syntax-checked):
 - Customer registration: instant/automatic activation once ID verification passes, no manual
   review queue.
 - Admin endpoints to list/approve/reject pending renters.
-- 13 automated tests (unit + integration, run with the real database, not mocked) - all
+- **Accommodation listing CRUD** (added 2026-09-23): approved Renters can create, list, read,
+  update, deactivate/reactivate their own listings; tag amenities; attach image URLs (see
+  caveat below - no file upload yet, URLs only); mark/unmark the 30-day Live Viewing
+  availability calendar. Public endpoints list price caps and amenities (for building
+  location/amenity pickers) and read a single active listing with `contact_info` withheld
+  until checkout exists (spec/requirements-v1.md > Renter Account & Flow). Creating or
+  editing a listing's location re-runs the Price Cap check via the same DB trigger used at
+  the schema level.
+- 21 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
+**Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
+`src/modules/accommodations/accommodationService.js` for the full reasoning):
+- Images are stored as plain URLs the Renter supplies - there's no file-upload-to-cloud-storage
+  endpoint yet (no storage provider has been chosen). Revisit once one is.
+- Editing `numberOfUnits` resets `unitsAvailable` to match it. Fine while no booking flow
+  exists yet to be holding units against active bookings - revisit once bookings exist, so an
+  in-progress booking's held units aren't silently overwritten by an edit.
+
 **Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list):
-accommodation listing CRUD beyond the schema itself, search/booking flow, the
-Rent/Admin-Costs/VAT/commission checkout math module, Paystack/Termii/Prembly *live*
-integrations (Prembly's provider is written but untested against real credentials - see the
-caveat at the top of `src/modules/idVerification/premblyProvider.js`), the 9pm check-in-day
-scheduled payout job, the Admin dashboard UI itself, and the mobile app.
+search/booking flow, the Rent/Admin-Costs/VAT/commission checkout math module,
+Paystack/Termii/Prembly *live* integrations (Prembly's provider is written but untested
+against real credentials - see the caveat at the top of
+`src/modules/idVerification/premblyProvider.js`), the 9pm check-in-day scheduled payout job,
+the Admin dashboard UI itself, and the mobile app.
 
 ## Requirements
 
@@ -88,6 +103,7 @@ src/
     renters/        renter registration + lookup
     customers/      customer registration
     admin/          renter approval queue
+    accommodations/ listing CRUD, price-cap lookup, amenities/images/viewing-availability
   routes/           Express routers + Zod request validation
   app.js            Express app wiring (no listen() - used directly by tests)
   server.js         actual process entrypoint
