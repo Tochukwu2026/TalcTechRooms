@@ -10,10 +10,12 @@ const {
   viewingAvailabilitySchema,
   searchQuerySchema,
   availabilityQuerySchema,
+  checkoutPreviewQuerySchema,
   validateBody,
   validateQuery,
 } = require('./validation');
 const accommodationService = require('../modules/accommodations/accommodationService');
+const checkoutService = require('../modules/checkout/checkoutService');
 
 const router = Router();
 
@@ -65,6 +67,23 @@ router.get(
       Number(req.params.id),
       req.query.checkIn,
       req.query.checkOut
+    );
+    res.json(result);
+  })
+);
+
+// --- Public checkout preview (Total Price + nightly breakdown, before Confirm Booking) ---
+
+router.get(
+  '/:id/checkout-preview',
+  validateQuery(checkoutPreviewQuerySchema),
+  asyncHandler(async (req, res) => {
+    const units = req.query.units ?? 1;
+    const result = await checkoutService.getBookingCheckoutPreview(
+      Number(req.params.id),
+      req.query.checkIn,
+      req.query.checkOut,
+      units
     );
     res.json(result);
   })

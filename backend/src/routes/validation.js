@@ -114,6 +114,17 @@ const availabilityQuerySchema = z
     path: ['checkOut'],
   });
 
+const checkoutPreviewQuerySchema = z
+  .object({
+    checkIn: isoDate,
+    checkOut: isoDate,
+    units: z.coerce.number().int().positive().max(1000).optional(),
+  })
+  .refine((data) => data.checkOut > data.checkIn, {
+    message: 'checkOut must be after checkIn.',
+    path: ['checkOut'],
+  });
+
 function validateBody(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -154,6 +165,7 @@ module.exports = {
   viewingAvailabilitySchema,
   searchQuerySchema,
   availabilityQuerySchema,
+  checkoutPreviewQuerySchema,
   validateBody,
   validateQuery,
 };

@@ -57,7 +57,24 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   actually reserving units requires the checkout cost breakdown (Rent/Admin Costs/VAT/
   commission) and Paystack, both still to be built - so today this will always report full
   availability; the tests exercise the overlap math by inserting `bookings` rows directly.
-- 26 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Checkout cost module** (added 2026-09-24): `src/modules/checkout/checkoutMath.js` computes
+  the Rent + Admin Costs + VAT breakdown and the 85/15 Renter/TalcTech commission split,
+  reading commission %, VAT %, the flat admin fee and SMS cost from the Admin-editable
+  `admin_settings` table (never hardcoded), and working in integer kobo throughout to avoid
+  the floating-point rounding drift that produced the founder's own ₦0.25 arithmetic error
+  caught earlier (see decisions log) - unit tests assert the exact figures from both worked
+  examples there (₦20,000 rent → ₦21,613.84 total; ₦10,000 Executive subscription →
+  ₦10,863.84/month).
+  - `GET /accommodations/:id/checkout-preview?checkIn=&checkOut=&units=` (public) - the
+    Bookings Homepage's "Total Price, nightly price breakdown", checked against live
+    availability (rejects if not enough units are free for those dates).
+  - `GET /customers/executive-subscription-cost` (public) - the real monthly Executive price
+    at current rates, for a signup page to display.
+  - **Does not create a booking** - both endpoints are read-only previews. Actually reserving
+    units and charging the Customer needs Paystack, which isn't integrated yet; see decisions
+    log's Build Phasing for what real booking creation still requires (payment, the two-path
+    Renter payout, confirmation emails/SMS).
+- 35 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
