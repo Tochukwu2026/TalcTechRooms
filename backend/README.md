@@ -74,7 +74,20 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     units and charging the Customer needs Paystack, which isn't integrated yet; see decisions
     log's Build Phasing for what real booking creation still requires (payment, the two-path
     Renter payout, confirmation emails/SMS).
-- 35 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Admin management endpoints** (added 2026-09-24, backing the new Admin dashboard - see
+  `../admin-dashboard/`): Price Cap and business-settings management on top of tables that
+  already existed but had no admin-facing API:
+  - `GET /admin/price-caps`, `POST /admin/price-caps` (create/update a location's cap -
+    upserts by `(state, area)`, so re-posting an existing location just updates its cap),
+    `PATCH /admin/price-caps/:id` (adjust an existing location's cap only).
+  - `GET /admin/settings`, `PATCH /admin/settings/:key` - commission %, VAT %, admin fee, SMS
+    cost, Executive subscription base fee. Read fresh (not cached) by the checkout module, so a
+    change here takes effect on the very next checkout preview.
+  - **`npm run create-admin -- --email <email> --password <password> --name "Full Name"`**
+    (`src/db/createAdmin.js`) - there is deliberately no public self-registration endpoint for
+    Admin accounts, so this is how the first (and any additional) Admin login gets created;
+    re-running it for the same email resets that Admin's password instead of erroring.
+- 40 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in

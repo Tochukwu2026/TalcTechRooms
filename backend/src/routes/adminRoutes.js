@@ -2,8 +2,22 @@ const { Router } = require('express');
 const { z } = require('zod');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { listPendingRenters, approveRenter, rejectRenter } = require('../modules/admin/adminService');
-const { validateBody } = require('./validation');
+const {
+  listPendingRenters,
+  approveRenter,
+  rejectRenter,
+  listPriceCaps,
+  updatePriceCap,
+  createPriceCap,
+  listSettings,
+  updateSetting,
+} = require('../modules/admin/adminService');
+const {
+  validateBody,
+  updatePriceCapSchema,
+  createPriceCapSchema,
+  updateSettingSchema,
+} = require('./validation');
 
 const router = Router();
 
@@ -38,6 +52,51 @@ router.post(
       adminUserId: req.user.id,
       reason: req.body.reason,
     });
+    res.json(result);
+  })
+);
+
+// --- Price Cap management ---
+
+router.get(
+  '/price-caps',
+  asyncHandler(async (req, res) => {
+    res.json(await listPriceCaps());
+  })
+);
+
+router.post(
+  '/price-caps',
+  validateBody(createPriceCapSchema),
+  asyncHandler(async (req, res) => {
+    const result = await createPriceCap(req.body);
+    res.status(201).json(result);
+  })
+);
+
+router.patch(
+  '/price-caps/:id',
+  validateBody(updatePriceCapSchema),
+  asyncHandler(async (req, res) => {
+    const result = await updatePriceCap(Number(req.params.id), req.body.capNaira);
+    res.json(result);
+  })
+);
+
+// --- Admin-editable business settings (commission %, VAT %, admin fee, SMS cost, etc.) ---
+
+router.get(
+  '/settings',
+  asyncHandler(async (req, res) => {
+    res.json(await listSettings());
+  })
+);
+
+router.patch(
+  '/settings/:key',
+  validateBody(updateSettingSchema),
+  asyncHandler(async (req, res) => {
+    const result = await updateSetting(req.params.key, req.body.value);
     res.json(result);
   })
 );

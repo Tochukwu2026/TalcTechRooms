@@ -66,4 +66,76 @@ async function rejectRenter({ renterUserId, adminUserId, reason }) {
   return rows[0];
 }
 
-module.exports = { listPendingRenters, approveRenter, rejectRenter };
+// --- Price Cap management (spec/decisions-and-phasing.md > Admin Portal) ---
+
+async function listPriceCaps() {
+  const { rows } = await pool.query(
+    'SELECT id, state, area, cap_naira FROM price_caps ORDER BY state ASC, area ASC NULLS FIRST'
+  );
+  return rows;
+}
+
+/**
+ * Adjusts an existing location's cap. Deliberately does not allow changing state/area on an
+ * existing row (those are its identity - accommodations reference it by id, and the Lagos
+ * picklist / flat-state-cap logic elsewhere assumes state+area is stable) - creating a new
+ * location goes through createPriceCap below instead.
+ */
+async function updatePriceCap(id, capNaira) {
+  const { rows } = await pool.query(
+    'UPDATE price_caps SET cap_naira = $1 WHERE id = $2 RETURNING id, state, area, cap_naira',
+    [capNaira, id]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, 'Price cap not found.');
+  }
+  return rows[0];
+}
+
+/**
+ * Adds a new supported location (e.g. a 12th Lagos area, or a new state). Uses the same
+ * (state, COALESCE(area, '')) unique index as the seed data (src/db/migrations/0009_*) so this
+ * can't silently create a duplicate flat-state-cap row; re-posting an existing location just
+ * updates its cap instead of erroring.
+ */
+async function createPriceCap({ state, area, capNaira }) {
+  const { rows } = await pool.query(
+    `INSERT INTO price_caps (state, area, cap_naira) VALUES ($1, $2, $3)
+     ON CONFLICT (state, (COALESCE(area, ''))) DO UPDATE SET cap_naira = EXCLUDED.cap_naira
+     RETURNING id, state, area, cap_naira`,
+    [state, area || null, capNaira]
+  );
+  return rows[0];
+}
+
+// --- Admin-editable business settings (commission %, VAT %, admin fee, SMS cost, etc.) ---
+
+async function listSettings() {
+  const { rows } = await pool.query(
+    'SELECT key, value, description, updated_at FROM admin_settings ORDER BY key ASC'
+  );
+  return rows;
+}
+
+async function updateSetting(key, value) {
+  const { rows } = await pool.query(
+    `UPDATE admin_settings SET value = $1, updated_at = now() WHERE key = $2
+     RETURNING key, value, description, updated_at`,
+    [String(value), key]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, `Unknown setting: ${key}`);
+  }
+  return rows[0];
+}
+
+module.exports = {
+  listPendingRenters,
+  approveRenter,
+  rejectRenter,
+  listPriceCaps,
+  updatePriceCap,
+  createPriceCap,
+  listSettings,
+  updateSetting,
+};

@@ -125,6 +125,29 @@ const checkoutPreviewQuerySchema = z
     path: ['checkOut'],
   });
 
+const updatePriceCapSchema = z.object({
+  capNaira: z.number().positive().max(10000000),
+});
+
+const createPriceCapSchema = z.object({
+  state: z.string().min(2).max(100),
+  area: z.string().min(2).max(100).optional(),
+  capNaira: z.number().positive().max(10000000),
+});
+
+// All current admin_settings values are numeric (commission_percent, vat_percent,
+// admin_fee_naira, sms_cost_naira, executive_subscription_naira) - see
+// src/db/seeds/002_admin_settings.sql. If a non-numeric setting is ever added, this will need
+// to stop being a blanket numeric check.
+const updateSettingSchema = z
+  .object({
+    value: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  })
+  .refine((data) => !Number.isNaN(Number(data.value)) && data.value.trim() !== '', {
+    message: 'value must be numeric - all current admin settings are numeric.',
+    path: ['value'],
+  });
+
 function validateBody(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -166,6 +189,9 @@ module.exports = {
   searchQuerySchema,
   availabilityQuerySchema,
   checkoutPreviewQuerySchema,
+  updatePriceCapSchema,
+  createPriceCapSchema,
+  updateSettingSchema,
   validateBody,
   validateQuery,
 };
