@@ -80,6 +80,40 @@ const viewingAvailabilitySchema = z.object({
   dates: z.array(isoDate).min(1).max(30),
 });
 
+// Query params arrive as strings, so numeric fields use z.coerce.
+const searchQuerySchema = z
+  .object({
+    state: z.string().min(2).max(100).optional(),
+    area: z.string().min(2).max(100).optional(),
+    type: z.enum(ACCOMMODATION_TYPES).optional(),
+    checkIn: isoDate.optional(),
+    checkOut: isoDate.optional(),
+    minPrice: z.coerce.number().positive().optional(),
+    maxPrice: z.coerce.number().positive().optional(),
+  })
+  .refine((data) => Boolean(data.checkIn) === Boolean(data.checkOut), {
+    message: 'checkIn and checkOut must be provided together.',
+    path: ['checkIn'],
+  })
+  .refine((data) => !data.checkIn || !data.checkOut || data.checkOut > data.checkIn, {
+    message: 'checkOut must be after checkIn.',
+    path: ['checkOut'],
+  })
+  .refine((data) => data.minPrice === undefined || data.maxPrice === undefined || data.maxPrice >= data.minPrice, {
+    message: 'maxPrice must be greater than or equal to minPrice.',
+    path: ['maxPrice'],
+  });
+
+const availabilityQuerySchema = z
+  .object({
+    checkIn: isoDate,
+    checkOut: isoDate,
+  })
+  .refine((data) => data.checkOut > data.checkIn, {
+    message: 'checkOut must be after checkIn.',
+    path: ['checkOut'],
+  });
+
 function validateBody(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -94,6 +128,20 @@ function validateBody(schema) {
   };
 }
 
+function validateQuery(schema) {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      return res.status(422).json({
+        error: 'Validation failed.',
+        details: result.error.flatten(),
+      });
+    }
+    req.query = result.data;
+    return next();
+  };
+}
+
 module.exports = {
   renterRegisterSchema,
   customerRegisterSchema,
@@ -104,5 +152,8 @@ module.exports = {
   requestImageUploadUrlSchema,
   confirmImageSchema,
   viewingAvailabilitySchema,
+  searchQuerySchema,
+  availabilityQuerySchema,
   validateBody,
+  validateQuery,
 };

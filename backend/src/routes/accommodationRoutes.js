@@ -8,7 +8,10 @@ const {
   requestImageUploadUrlSchema,
   confirmImageSchema,
   viewingAvailabilitySchema,
+  searchQuerySchema,
+  availabilityQuerySchema,
   validateBody,
+  validateQuery,
 } = require('./validation');
 const accommodationService = require('../modules/accommodations/accommodationService');
 
@@ -30,6 +33,18 @@ router.get(
   })
 );
 
+// --- Public search (Main Homepage search bar) - registered before "/:id" so "/search" isn't
+// swallowed by the "/:id" param route. ---
+
+router.get(
+  '/search',
+  validateQuery(searchQuerySchema),
+  asyncHandler(async (req, res) => {
+    const results = await accommodationService.searchAccommodations(req.query);
+    res.json(results);
+  })
+);
+
 // --- Public read of a single listing (contact info withheld - see service for why) ---
 
 router.get(
@@ -37,6 +52,21 @@ router.get(
   asyncHandler(async (req, res) => {
     const accommodation = await accommodationService.getAccommodationPublic(Number(req.params.id));
     res.json(accommodation);
+  })
+);
+
+// --- Public per-listing availability check (Bookings Homepage "Units" tab) ---
+
+router.get(
+  '/:id/availability',
+  validateQuery(availabilityQuerySchema),
+  asyncHandler(async (req, res) => {
+    const result = await accommodationService.getAccommodationAvailability(
+      Number(req.params.id),
+      req.query.checkIn,
+      req.query.checkOut
+    );
+    res.json(result);
   })
 );
 

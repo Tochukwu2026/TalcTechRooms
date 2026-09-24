@@ -1,6 +1,7 @@
 const { pool, withTransaction } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
 const storage = require('../storage');
+const availability = require('../booking/availabilityService');
 
 /**
  * Looks up the price_cap_id for a given {state, area}. area is required for Lagos and must
@@ -218,8 +219,106 @@ async function getAccommodationPublic(accommodationId) {
     throw new ApiError(404, 'Accommodation not found.');
   }
   const full = await attachRelations(rows[0]);
-  const { contact_info, ...withoutContact } = full;
+  return stripContactInfo(full);
+}
+
+function stripContactInfo(listing) {
+  const { contact_info, ...withoutContact } = listing;
   return withoutContact;
+}
+
+/**
+ * Main Homepage search (spec/requirements-v1.md > Customer-Facing Browse & Booking Flow):
+ * filters active listings by location/type/price, and - when a check-in/check-out range is
+ * given - annotates each result with unitsAvailableForDates so the search results can already
+ * show "3 units left for these dates" the way a hotel/flight search would. Contact info is
+ * always stripped, same as the single-listing public view.
+ */
+async function searchAccommodations({ state, area, type, checkIn, checkOut, minPrice, maxPrice }) {
+  const conditions = ['a.is_active = true'];
+  const params = [];
+  let i = 1;
+
+  if (state) {
+    conditions.push(`pc.state = $${i++}`);
+    params.push(state);
+  }
+  if (area) {
+    conditions.push(`pc.area = $${i++}`);
+    params.push(area);
+  }
+  if (type) {
+    conditions.push(`a.type = $${i++}`);
+    params.push(type);
+  }
+  if (minPrice !== undefined) {
+    conditions.push(`a.nightly_rent_naira >= $${i++}`);
+    params.push(minPrice);
+  }
+  if (maxPrice !== undefined) {
+    conditions.push(`a.nightly_rent_naira <= $${i++}`);
+    params.push(maxPrice);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT ${LISTING_COLUMNS}
+     FROM accommodations a
+     JOIN price_caps pc ON pc.id = a.price_cap_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY a.created_at DESC`,
+    params
+  );
+
+  const listings = await Promise.all(rows.map((row) => attachRelations(row)));
+
+  if (checkIn && checkOut) {
+    await Promise.all(
+      listings.map(async (listing) => {
+        listing.unitsAvailableForDates = await availability.getUnitsAvailable(
+          listing.id,
+          listing.number_of_units,
+          checkIn,
+          checkOut
+        );
+      })
+    );
+  }
+
+  return listings.map(stripContactInfo);
+}
+
+/**
+ * The Bookings Homepage's Units tab (spec/requirements-v1.md): given a stay's check-in/
+ * check-out dates, how many of this listing's units are still free, and the nightly rent to
+ * price it with (the Rent/Admin Costs/VAT/commission breakdown itself is a separate,
+ * not-yet-built checkout module - see decisions log).
+ */
+async function getAccommodationAvailability(accommodationId, checkIn, checkOut) {
+  const { rows } = await pool.query(
+    `SELECT number_of_units, nightly_rent_naira
+     FROM accommodations
+     WHERE id = $1 AND is_active = true`,
+    [accommodationId]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, 'Accommodation not found.');
+  }
+  const numberOfUnits = rows[0].number_of_units;
+  const nightlyRentNaira = Number(rows[0].nightly_rent_naira);
+  const unitsAvailable = await availability.getUnitsAvailable(accommodationId, numberOfUnits, checkIn, checkOut);
+  const nights = Math.round(
+    (new Date(`${checkOut}T00:00:00Z`).getTime() - new Date(`${checkIn}T00:00:00Z`).getTime()) / 86400000
+  );
+
+  return {
+    accommodationId,
+    checkIn,
+    checkOut,
+    nights,
+    numberOfUnits,
+    unitsAvailable,
+    nightlyRentNaira,
+  };
 }
 
 async function attachRelations(row, client = pool) {
@@ -426,6 +525,8 @@ module.exports = {
   listOwnAccommodations,
   getAccommodationForOwner,
   getAccommodationPublic,
+  searchAccommodations,
+  getAccommodationAvailability,
   replaceAmenities,
   requestImageUploadUrl,
   confirmAccommodationImage,

@@ -4,7 +4,7 @@ Node.js + Express + PostgreSQL backend for the TalcTech Rooms overnight-rentals 
 See `../spec/requirements-v1.md` and `../spec/decisions-and-phasing.md` for the full product
 spec and confirmed business decisions this code implements.
 
-## Status (2026-09-23)
+## Status (2026-09-24)
 
 Built and verified against a real local PostgreSQL instance (not just syntax-checked):
 
@@ -45,7 +45,19 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   rows and replaces the constraint with a `(state, COALESCE(area, ''))` unique index; the seed
   script's `ON CONFLICT` clause was updated to match. Verified idempotent: running
   `npm run seed` twice now yields exactly 22 rows, not 33.
-- 21 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Search + availability** (added 2026-09-24): `GET /accommodations/search` (public) - filters
+  active listings by `state`, `area`, `type`, `minPrice`/`maxPrice`, and optionally a
+  `checkIn`/`checkOut` date range, in which case each result gets a live
+  `unitsAvailableForDates` count. `GET /accommodations/:id/availability?checkIn=&checkOut=`
+  (public) is the Bookings Homepage's "Units" tab: returns `unitsAvailable`, `numberOfUnits`,
+  `nights` and `nightlyRentNaira` for that stay. Availability is computed directly against the
+  `bookings` table (already in the schema from Phase 1) by summing `units_booked` from any
+  non-canceled booking whose date range overlaps the requested one - see
+  `src/modules/booking/availabilityService.js`. **No booking-creation endpoint exists yet** -
+  actually reserving units requires the checkout cost breakdown (Rent/Admin Costs/VAT/
+  commission) and Paystack, both still to be built - so today this will always report full
+  availability; the tests exercise the overlap math by inserting `bookings` rows directly.
+- 26 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
