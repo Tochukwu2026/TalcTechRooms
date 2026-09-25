@@ -125,6 +125,17 @@ const checkoutPreviewQuerySchema = z
     path: ['checkOut'],
   });
 
+const initializeBookingSchema = z
+  .object({
+    checkIn: isoDate,
+    checkOut: isoDate,
+    units: z.coerce.number().int().positive().max(1000).optional().default(1),
+  })
+  .refine((data) => data.checkOut > data.checkIn, {
+    message: 'checkOut must be after checkIn.',
+    path: ['checkOut'],
+  });
+
 const updatePriceCapSchema = z.object({
   capNaira: z.number().positive().max(10000000),
 });
@@ -189,6 +200,7 @@ module.exports = {
   searchQuerySchema,
   availabilityQuerySchema,
   checkoutPreviewQuerySchema,
+  initializeBookingSchema,
   updatePriceCapSchema,
   createPriceCapSchema,
   updateSettingSchema,

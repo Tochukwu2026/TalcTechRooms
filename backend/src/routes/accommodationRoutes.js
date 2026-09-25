@@ -11,11 +11,13 @@ const {
   searchQuerySchema,
   availabilityQuerySchema,
   checkoutPreviewQuerySchema,
+  initializeBookingSchema,
   validateBody,
   validateQuery,
 } = require('./validation');
 const accommodationService = require('../modules/accommodations/accommodationService');
 const checkoutService = require('../modules/checkout/checkoutService');
+const bookingService = require('../modules/booking/bookingService');
 
 const router = Router();
 
@@ -86,6 +88,26 @@ router.get(
       units
     );
     res.json(result);
+  })
+);
+
+// --- Booking creation (Customer only) - starts a Paystack charge; does NOT create a booking
+// row yet (a booking only exists once the charge is confirmed - see bookingRoutes.js /verify
+// and webhookRoutes.js). ---
+
+router.post(
+  '/:id/bookings/initialize',
+  authenticate,
+  requireRole('customer'),
+  validateBody(initializeBookingSchema),
+  asyncHandler(async (req, res) => {
+    const result = await bookingService.initializeBooking(
+      req.user.id,
+      req.user.email,
+      Number(req.params.id),
+      req.body
+    );
+    res.status(201).json(result);
   })
 );
 

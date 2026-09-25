@@ -41,14 +41,14 @@ function round2(n) {
 }
 
 /**
- * Full checkout preview for a stay: Total Cost of Rent (nightly rate * nights * units), the
- * Admin Costs/VAT/commission breakdown, and how many units are actually still free for these
- * dates (spec/requirements-v1.md > Bookings Homepage "Total Price, nightly price breakdown").
- * Public/read-only - does NOT create a booking or hold the units. Real booking creation needs
- * Paystack, which isn't wired up yet (see decisions log) - this just answers "what would this
- * cost, and can I even book that many units for these dates".
+ * Shared by the read-only checkout preview AND real booking creation (bookingService): looks
+ * up the listing, checks the requested unit count against both the listing's total and what's
+ * actually free for these dates, and computes the full Rent/Admin Costs/VAT/commission
+ * breakdown at current Admin-settings rates. Throws the same 404/400/409 ApiErrors either way,
+ * so a Customer sees an identical error whether they're just previewing a price or actually
+ * trying to book - the preview is a live, load-bearing check, not a rough estimate.
  */
-async function getBookingCheckoutPreview(accommodationId, checkIn, checkOut, unitsRequested) {
+async function resolveBookingQuote(accommodationId, checkIn, checkOut, unitsRequested) {
   const { rows } = await pool.query(
     `SELECT number_of_units, nightly_rent_naira FROM accommodations WHERE id = $1 AND is_active = true`,
     [accommodationId]
@@ -81,9 +81,34 @@ async function getBookingCheckoutPreview(accommodationId, checkIn, checkOut, uni
     checkIn,
     checkOut,
     nights,
+    numberOfUnits,
     unitsRequested,
     unitsAvailable,
     nightlyRentNaira,
+    breakdown,
+  };
+}
+
+/**
+ * Full checkout preview for a stay: Total Cost of Rent (nightly rate * nights * units), the
+ * Admin Costs/VAT/commission breakdown, and how many units are actually still free for these
+ * dates (spec/requirements-v1.md > Bookings Homepage "Total Price, nightly price breakdown").
+ * Public/read-only - does NOT create a booking or hold the units, and does NOT initialize a
+ * Paystack charge (see bookingService.initializeBooking for that) - this just answers "what
+ * would this cost, and can I even book that many units for these dates".
+ */
+async function getBookingCheckoutPreview(accommodationId, checkIn, checkOut, unitsRequested) {
+  const quote = await resolveBookingQuote(accommodationId, checkIn, checkOut, unitsRequested);
+  const { breakdown } = quote;
+
+  return {
+    accommodationId: quote.accommodationId,
+    checkIn: quote.checkIn,
+    checkOut: quote.checkOut,
+    nights: quote.nights,
+    unitsRequested: quote.unitsRequested,
+    unitsAvailable: quote.unitsAvailable,
+    nightlyRentNaira: quote.nightlyRentNaira,
     rentNaira: breakdown.baseAmountNaira,
     adminCostsNaira: breakdown.adminCostsNaira,
     vatNaira: breakdown.vatNaira,
@@ -109,4 +134,9 @@ async function getExecutiveSubscriptionPreview() {
   };
 }
 
-module.exports = { getAdminSettings, getBookingCheckoutPreview, getExecutiveSubscriptionPreview };
+module.exports = {
+  getAdminSettings,
+  resolveBookingQuote,
+  getBookingCheckoutPreview,
+  getExecutiveSubscriptionPreview,
+};

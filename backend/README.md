@@ -87,7 +87,39 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     (`src/db/createAdmin.js`) - there is deliberately no public self-registration endpoint for
     Admin accounts, so this is how the first (and any additional) Admin login gets created;
     re-running it for the same email resets that Admin's password instead of erroring.
-- 40 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Real booking creation + Paystack charge** (added 2026-09-25): the piece the checkout module
+  above deliberately stopped short of. Two-step flow, matching how Paystack's own
+  Initialize/Verify Transaction API works:
+  1. `POST /accommodations/:id/bookings/initialize` (Customer, ID verification must have
+     passed) - re-validates availability, computes the cost breakdown at the CURRENT
+     `admin_settings` rates via the same `resolveBookingQuote` the checkout preview uses, then
+     starts a Paystack charge for the total. Returns `{ reference, authorizationUrl, ... }`.
+     **No `bookings` row is created yet** - the full breakdown is locked into the charge's
+     `metadata` instead, since a booking only exists after payment (per the decisions log) and
+     the schema has no "pending" status to represent an unpaid attempt.
+  2. `POST /bookings/verify/:reference` (Customer) - the app's own fallback for confirming a
+     payment (there's no hosted checkout return-page built yet to receive Paystack's redirect).
+     Checks what Paystack says happened to the charge and, only if it succeeded, creates the
+     `bookings` row from the locked-in metadata - re-checking availability one more time first,
+     since time has passed since step 1. `POST /webhooks/paystack` is the real-world primary
+     trigger (Paystack calls this directly) and does the exact same finalize - both paths are
+     idempotent, so whichever gets there first "wins" and the other is a no-op.
+  - New provider-agnostic payments interface (`src/modules/payments`), `mock` mode by default -
+    see "Payments: mock vs. real Paystack" below for how the mock decides success/failure (there's
+    no real card-entry page yet to key it off).
+  - `GET /bookings/:id` (Customer, own bookings only) for basic retrieval.
+  - **Deliberately NOT built yet, by founder's own choice**: the two-path Renter payout (every
+    booking created here just sits at `payout_status='held'`, Path A's starting state) and the
+    9pm check-in-day scheduled job that would actually release it; and an automatic refund when
+    a charge succeeds but the units turned out to be taken in the meantime (`/bookings/verify`
+    returns a distinct `availability_conflict` status for this so the Customer can be told to
+    contact support, rather than silently creating an invalid booking or losing their money
+    without explanation).
+  - Test coverage: 12 new tests (3 unit tests for the mock Paystack provider's deterministic
+    success/failure behavior, 9 integration tests for the full initialize → verify → booking-row
+    flow, including idempotency, a declined charge, an unverified Customer being blocked, a
+    second Customer losing a race for the last unit, and ownership checks on `GET /bookings/:id`).
+- 52 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -100,12 +132,13 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   exists yet to be holding units against active bookings - revisit once bookings exist, so an
   in-progress booking's held units aren't silently overwritten by an edit.
 
-**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list):
-search/booking flow, the Rent/Admin-Costs/VAT/commission checkout math module,
-Paystack/Termii/Prembly *live* integrations (Prembly's provider is written but untested
-against real credentials - see the caveat at the top of
-`src/modules/idVerification/premblyProvider.js`), the 9pm check-in-day scheduled payout job,
-the Admin dashboard UI itself, and the mobile app.
+**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): the
+two-path Renter payout + the 9pm check-in-day scheduled payout job, an automatic refund on an
+availability conflict at booking-finalize time, Termii/Prembly/Paystack *live* integrations
+(all three providers are written but untested against real credentials - see the caveats at
+the top of `src/modules/idVerification/premblyProvider.js`, `src/modules/storage/gcsProvider.js`,
+and `src/modules/payments/paystackProvider.js`), staff assignment for viewings, the
+flagged-booking review queue, and the mobile app.
 
 ## Requirements
 
@@ -163,6 +196,23 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
   bucket/service account** - read the caveat at the top of `src/modules/storage/gcsProvider.js`
   before switching a real environment over to it.
 
+## Payments: mock vs. real Paystack
+
+`PAYSTACK_MODE` in `.env` controls which provider `src/modules/payments` uses:
+
+- `mock` (default): no real API calls, no real card entry (there's no hosted checkout page or
+  mobile app built yet to provide one). Deterministic instead: any Customer email containing
+  `+fail` right before the `@` (e.g. `jane+fail@example.com`) simulates a declined charge;
+  everything else simulates success. This convention goes away once a real checkout
+  page/SDK is integrated - at that point success/failure genuinely comes from Paystack.
+- `paystack`: calls the real Paystack REST API (Initialize/Verify Transaction). Requires
+  `PAYSTACK_SECRET_KEY` in `.env` - get real **test** keys from your own Paystack dashboard
+  (Settings > API Keys & Webhooks), never your Paystack account login/password. **This has not
+  been tested against real credentials** - read the caveat at the top of
+  `src/modules/payments/paystackProvider.js` before switching a real environment over to it,
+  including the webhook signature verification, which is written per Paystack's documented
+  scheme but never exercised against a real webhook payload.
+
 ## Project layout
 
 ```
@@ -176,11 +226,16 @@ src/
   modules/
     auth/           password hashing, JWT sign/verify, login service
     idVerification/ provider-agnostic interface + mock/prembly providers
+    storage/        provider-agnostic interface + mock/gcs providers (accommodation images)
+    payments/       provider-agnostic interface + mock/paystack providers (booking charges)
     renters/        renter registration + lookup
     customers/      customer registration
-    admin/          renter approval queue
+    admin/          renter approval queue, price-cap + settings management
     accommodations/ listing CRUD, price-cap lookup, amenities/images/viewing-availability
-  routes/           Express routers + Zod request validation
+    checkout/       Rent/Admin-Costs/VAT/commission math + admin_settings lookup
+    booking/        availability math + real booking creation (Paystack charge -> bookings row)
+  routes/           Express routers + Zod request validation (includes bookingRoutes.js and
+                    webhookRoutes.js for Paystack's own webhook)
   app.js            Express app wiring (no listen() - used directly by tests)
   server.js         actual process entrypoint
 test/

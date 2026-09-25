@@ -44,6 +44,17 @@ const config = {
     },
   },
 
+  payments: {
+    // 'mock' simulates Paystack charges with no real API calls, so booking creation can be
+    // built and tested before real Paystack credentials exist - see src/modules/payments.
+    mode: required('PAYSTACK_MODE', 'mock'),
+    paystack: {
+      secretKey: process.env.PAYSTACK_SECRET_KEY || '',
+      publicKey: process.env.PAYSTACK_PUBLIC_KEY || '',
+      baseUrl: required('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+    },
+  },
+
   // Business rules from spec/decisions-and-phasing.md - kept here as defaults/fallbacks only.
   // The authoritative values live in the admin_settings / price_caps DB tables so Admin can
   // change them without a redeploy; these constants are used only for seeding those tables.

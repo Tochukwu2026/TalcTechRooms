@@ -8,6 +8,8 @@ const renterRoutes = require('./routes/renterRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const accommodationRoutes = require('./routes/accommodationRoutes');
+const bookingRoutes = require('./routes/bookingRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 function createApp() {
@@ -15,7 +17,16 @@ function createApp() {
 
   app.use(helmet());
   app.use(cors());
-  app.use(express.json());
+  // Stashes the raw request body bytes on req.rawBody, needed to verify Paystack's webhook
+  // HMAC signature (webhookRoutes.js) - a re-serialized JSON object won't match the signature,
+  // only the exact bytes Paystack sent.
+  app.use(
+    express.json({
+      verify: (req, res, buf) => {
+        req.rawBody = buf;
+      },
+    })
+  );
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
   }
@@ -29,6 +40,8 @@ function createApp() {
   app.use('/customers', customerRoutes);
   app.use('/admin', adminRoutes);
   app.use('/accommodations', accommodationRoutes);
+  app.use('/bookings', bookingRoutes);
+  app.use('/webhooks', webhookRoutes);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found.' });
