@@ -1,8 +1,8 @@
 const { Router } = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { registerRenter, getRenterById } = require('../modules/renters/renterService');
-const { renterRegisterSchema, validateBody } = require('./validation');
+const { registerRenter, getRenterById, updateBankDetails } = require('../modules/renters/renterService');
+const { renterRegisterSchema, bankDetailsSchema, validateBody } = require('./validation');
 
 const router = Router();
 
@@ -21,6 +21,17 @@ router.get(
   requireRole('renter'),
   asyncHandler(async (req, res) => {
     const renter = await getRenterById(req.user.id);
+    res.json(renter);
+  })
+);
+
+router.patch(
+  '/me/bank-details',
+  authenticate,
+  requireRole('renter'),
+  validateBody(bankDetailsSchema),
+  asyncHandler(async (req, res) => {
+    const renter = await updateBankDetails(req.user.id, req.body);
     res.json(renter);
   })
 );

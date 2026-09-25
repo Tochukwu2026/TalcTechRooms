@@ -12,11 +12,13 @@ const {
   listSettings,
   updateSetting,
 } = require('../modules/admin/adminService');
+const payoutService = require('../modules/payout/payoutService');
 const {
   validateBody,
   updatePriceCapSchema,
   createPriceCapSchema,
   updateSettingSchema,
+  resolveReviewCaseSchema,
 } = require('./validation');
 
 const router = Router();
@@ -97,6 +99,27 @@ router.patch(
   validateBody(updateSettingSchema),
   asyncHandler(async (req, res) => {
     const result = await updateSetting(req.params.key, req.body.value);
+    res.json(result);
+  })
+);
+
+// --- Renter payout review queue (Path A only - Path B never enters this queue) ---
+// See spec/decisions-and-phasing.md > Renter Payout: flagged/reported check-in-day bookings
+// land here for manual resolution.
+
+router.get(
+  '/review-cases',
+  asyncHandler(async (req, res) => {
+    const status = req.query.status === 'resolved' ? 'resolved' : 'open';
+    res.json(await payoutService.listReviewCases(status));
+  })
+);
+
+router.patch(
+  '/review-cases/:id/resolve',
+  validateBody(resolveReviewCaseSchema),
+  asyncHandler(async (req, res) => {
+    const result = await payoutService.resolveReviewCase(Number(req.params.id), req.user.id, req.body);
     res.json(result);
   })
 );

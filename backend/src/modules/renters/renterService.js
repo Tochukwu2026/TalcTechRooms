@@ -65,7 +65,8 @@ async function getRenterById(userId) {
   const { pool } = require('../../db/pool');
   const { rows } = await pool.query(
     `SELECT u.id, u.email, u.phone, u.full_name, r.address, r.approval_status,
-            r.approved_at, r.rejection_reason
+            r.approved_at, r.rejection_reason, r.bank_name, r.bank_account_number,
+            r.bank_account_name
      FROM users u JOIN renters r ON r.user_id = u.id
      WHERE u.id = $1`,
     [userId]
@@ -76,4 +77,27 @@ async function getRenterById(userId) {
   return rows[0];
 }
 
-module.exports = { registerRenter, getRenterById };
+/**
+ * Lets a Renter supply/update the bank account their payouts get sent to (see
+ * spec/decisions-and-phasing.md > Renter Payout). No verification of the bank details
+ * themselves happens here (e.g. no Paystack "resolve account number" call) - if the details are
+ * wrong, the payout attempt itself will fail and land in admin review (see
+ * modules/payout/payoutService.releasePayoutForBooking), which is the same failure path a
+ * genuinely-wrong-but-well-formed account number would hit anyway.
+ */
+async function updateBankDetails(userId, { bankName, bankAccountNumber, bankAccountName }) {
+  const { pool } = require('../../db/pool');
+  const { rows } = await pool.query(
+    `UPDATE renters
+     SET bank_name = $2, bank_account_number = $3, bank_account_name = $4
+     WHERE user_id = $1
+     RETURNING user_id, bank_name, bank_account_number, bank_account_name`,
+    [userId, bankName, bankAccountNumber, bankAccountName]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, 'Renter not found.');
+  }
+  return rows[0];
+}
+
+module.exports = { registerRenter, getRenterById, updateBankDetails };

@@ -4,7 +4,7 @@ Node.js + Express + PostgreSQL backend for the TalcTech Rooms overnight-rentals 
 See `../spec/requirements-v1.md` and `../spec/decisions-and-phasing.md` for the full product
 spec and confirmed business decisions this code implements.
 
-## Status (2026-09-24)
+## Status (2026-09-25)
 
 Built and verified against a real local PostgreSQL instance (not just syntax-checked):
 
@@ -108,18 +108,72 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     see "Payments: mock vs. real Paystack" below for how the mock decides success/failure (there's
     no real card-entry page yet to key it off).
   - `GET /bookings/:id` (Customer, own bookings only) for basic retrieval.
-  - **Deliberately NOT built yet, by founder's own choice**: the two-path Renter payout (every
-    booking created here just sits at `payout_status='held'`, Path A's starting state) and the
-    9pm check-in-day scheduled job that would actually release it; and an automatic refund when
-    a charge succeeds but the units turned out to be taken in the meantime (`/bookings/verify`
-    returns a distinct `availability_conflict` status for this so the Customer can be told to
-    contact support, rather than silently creating an invalid booking or losing their money
-    without explanation).
+  - **Deliberately NOT built yet, by founder's own choice**: an automatic refund when a charge
+    succeeds but the units turned out to be taken in the meantime (`/bookings/verify` returns a
+    distinct `availability_conflict` status for this so the Customer can be told to contact
+    support, rather than silently creating an invalid booking or losing their money without
+    explanation). The two-path Renter payout itself (below) is now built.
   - Test coverage: 12 new tests (3 unit tests for the mock Paystack provider's deterministic
     success/failure behavior, 9 integration tests for the full initialize → verify → booking-row
     flow, including idempotency, a declined charge, an unverified Customer being blocked, a
     second Customer losing a race for the last unit, and ownership checks on `GET /bookings/:id`).
-- 52 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Two-path Renter payout, BUILT AND TESTED (2026-09-25)** - the piece the booking-creation
+  milestone above deliberately stopped short of. Per the founder's explicit scope choice
+  ("Everything except real scheduling"): everything is built and tested except the 9pm trigger
+  itself, which is a standalone script, not wired to real cron infrastructure (none exists yet).
+  - **Path A - held until check-in day**: `POST /bookings/:id/confirm-check-in` (Customer) fires
+    the payout immediately (Renter's 85% net of nothing extra yet - no Paystack transfer-fee
+    logic exists, same as before - and TalcTech's 15% is simply recognized, no ledger entry
+    needed). `POST /bookings/:id/report-problem` (Customer, optional `{ notes }`) instead holds
+    the payout and opens an Admin review case (`reason='fraud_report'`). If a Customer does
+    neither, `src/jobs/evaluateCheckInDayPayouts.js` - a standalone script meant to be invoked
+    once daily at/after 9pm WAT by an external scheduler (`npm run evaluate-payouts`; see below) -
+    flags every still-`active`/`held` booking whose check-in date has arrived
+    (`reason='no_show_no_response'`). This job only ever flags - it never releases a payout,
+    since by construction a booking it reaches is one the Customer didn't act on.
+  - **Path B - instant on a confirmed no-refund cancellation**: `POST /bookings/:id/cancel`
+    (Customer) checks the booking's own check-in date against the existing 7-day refund cutoff:
+    `>=7` days out creates a `refunds` row (Rent portion only, `reason='customer_cancellation'`,
+    per the confirmed Refund scope rule) and marks `payout_status='not_applicable'` - no payout,
+    ever, for a refunded booking; `<7` days out (or on/after check-in) instead pays the Renter
+    and TalcTech out immediately, independent of check-in day.
+  - **Admin review queue**: `GET /admin/review-cases` (defaults to open cases; `?status=resolved`
+    for closed ones) and `PATCH /admin/review-cases/:id/resolve` with
+    `{ resolution: 'release_payout' | 'refund_customer', notes? }` - the former pays the Renter
+    (same transfer path as Path A/B), the latter refunds the Customer's Rent portion
+    (`reason='fraud_confirmed'`, since an admin-resolved review case is never a customer-initiated
+    cancellation) and marks the Renter as never paid for that booking.
+  - **Renter bank details**: `PATCH /renters/me/bank-details` with
+    `{ bankName, bankAccountNumber, bankAccountName }` - no verification of the details
+    themselves (e.g. no "resolve account number" call); wrong details simply make the payout
+    transfer fail, which lands the booking in `admin_review` rather than silently losing track of
+    the money - the same failure path a bad account number would hit through Paystack anyway.
+  - **New provider-agnostic function**: `payments.initiateTransfer(...)` (mock by default - a
+    bank account number ending in `0` deterministically simulates a failed transfer, mirroring
+    the ID-verification mock's "document number ending in 0" convention). The real
+    `paystackProvider.js` implementation is written from Paystack's Transfer API docs but has an
+    extra, more serious caveat than the charge side: it currently passes the Renter's free-text
+    `bank_name` through as Paystack's required numeric `bank_code`, which **will not work
+    against the real API as written** - resolving this (a `GET /bank` lookup, storing the real
+    code) is necessary before ever switching `PAYSTACK_MODE` away from `mock`. See the caveat
+    comment at the top of that function for the full list.
+  - **A real bug found and fixed while building this**: node-postgres was parsing `DATE` columns
+    (e.g. `bookings.check_in_date`) into JS `Date` objects at local midnight in the server
+    process's own timezone, which could silently shift the calendar date by a day depending on
+    that process's `TZ` setting - a correctness risk for exactly the kind of "is today the
+    check-in day" comparison this feature needed. Fixed globally in `src/db/pool.js` by telling
+    `pg` to keep `DATE` columns as plain `'YYYY-MM-DD'` strings, matching how the rest of the app
+    already treats dates.
+  - No new migration was needed - the Phase 1 schema already had every column/enum value this
+    required (`bookings.payout_status`, `admin_review_cases`, `refunds.reason`,
+    `renters.bank_*`).
+  - Test coverage: 2 new unit tests (the mock transfer provider's deterministic success/failure),
+    15 new integration tests (Path A confirm/report/admin-resolve both ways, the evaluation job
+    flagging an unconfirmed booking and leaving a confirmed one alone, Path B both the no-refund
+    and the >=7-day-refundable branches, a mock transfer failure landing in `admin_review` rather
+    than being silently lost, ownership/role checks, double-confirm rejection, and the bank-
+    details endpoint).
+- 67 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -132,13 +186,14 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   exists yet to be holding units against active bookings - revisit once bookings exist, so an
   in-progress booking's held units aren't silently overwritten by an edit.
 
-**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): the
-two-path Renter payout + the 9pm check-in-day scheduled payout job, an automatic refund on an
-availability conflict at booking-finalize time, Termii/Prembly/Paystack *live* integrations
-(all three providers are written but untested against real credentials - see the caveats at
-the top of `src/modules/idVerification/premblyProvider.js`, `src/modules/storage/gcsProvider.js`,
-and `src/modules/payments/paystackProvider.js`), staff assignment for viewings, the
-flagged-booking review queue, and the mobile app.
+**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): an
+automatic refund on an availability conflict at booking-finalize time, real cron/scheduler
+wiring for the 9pm-WAT payout evaluation script (see "evaluate-payouts" below), Termii/Prembly/
+Paystack *live* integrations (all providers are written but untested against real credentials -
+see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
+`src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js` -
+Paystack's Transfer (payout) side has an additional unresolved `bank_code` caveat, see below),
+staff assignment for viewings, and the mobile app.
 
 ## Requirements
 
@@ -168,6 +223,7 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
 | `npm run migrate:down` | Roll back the single most recent migration |
 | `npm run migrate:status` | List applied vs. pending migrations |
 | `npm run seed` | Load seed data (price caps, admin settings, amenities) |
+| `npm run evaluate-payouts` | Runs the 9pm-WAT check-in-day payout evaluation once (see "Renter Payout" below). CLI only, no HTTP endpoint - meant to be invoked once daily by an external scheduler (cron, GCP Cloud Scheduler, etc.) once one is set up; not wired to any scheduler yet |
 | `npm test` | Run the full unit + integration test suite (needs a real Postgres reachable via `DATABASE_URL`, ideally a disposable dev/test database - the integration tests `DELETE` rows from most tables between test cases) |
 
 ## ID verification: mock vs. real Prembly
@@ -212,6 +268,29 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
   `src/modules/payments/paystackProvider.js` before switching a real environment over to it,
   including the webhook signature verification, which is written per Paystack's documented
   scheme but never exercised against a real webhook payload.
+- The Transfer (payout) side has its own, more serious caveat on top of the above: it passes the
+  Renter's free-text `bank_name` through as Paystack's required numeric `bank_code`, which will
+  not work against the real API until either a `GET /bank` lookup table is added or the real
+  bank code is captured at bank-details-submission time instead of/alongside the bank name - see
+  the comment on `initiateTransfer` in `paystackProvider.js`.
+
+## Renter Payout: the two-path hold/release system
+
+See `spec/decisions-and-phasing.md` > Business Rules > Renter Payout for the full rationale (why
+there are two paths, why Path A holds until check-in day instead of using Paystack's instant
+split-payment feature). In short:
+
+- **Path A** (an active booking heading into check-in day): `POST /bookings/:id/confirm-check-in`
+  releases the payout right away; `POST /bookings/:id/report-problem` holds it and opens an
+  Admin review case instead; doing neither by check-in day gets the booking flagged for Admin
+  review by `npm run evaluate-payouts` (see above) rather than auto-paid.
+- **Path B** (a cancellation): `POST /bookings/:id/cancel` refunds the Rent portion if it's still
+  >=7 days before check-in, or pays the Renter/TalcTech out instantly otherwise - independent of
+  check-in day entirely.
+- **Admin resolution**: `GET /admin/review-cases` / `PATCH /admin/review-cases/:id/resolve`
+  (`{ resolution: 'release_payout' | 'refund_customer' }`) is where a held/flagged booking's
+  money actually moves, once an Admin has looked into it.
+- A Renter supplies payout bank details via `PATCH /renters/me/bank-details`.
 
 ## Project layout
 
@@ -227,13 +306,16 @@ src/
     auth/           password hashing, JWT sign/verify, login service
     idVerification/ provider-agnostic interface + mock/prembly providers
     storage/        provider-agnostic interface + mock/gcs providers (accommodation images)
-    payments/       provider-agnostic interface + mock/paystack providers (booking charges)
-    renters/        renter registration + lookup
+    payments/       provider-agnostic interface + mock/paystack providers (charges + transfers)
+    renters/        renter registration + lookup + bank-details update
     customers/      customer registration
     admin/          renter approval queue, price-cap + settings management
     accommodations/ listing CRUD, price-cap lookup, amenities/images/viewing-availability
     checkout/       Rent/Admin-Costs/VAT/commission math + admin_settings lookup
     booking/        availability math + real booking creation (Paystack charge -> bookings row)
+    payout/         two-path Renter payout (confirm-check-in/report-problem/cancel/admin resolve)
+  jobs/             standalone scripts, not HTTP routes (evaluateCheckInDayPayouts.js - the 9pm
+                    WAT check-in-day payout evaluation, run via `npm run evaluate-payouts`)
   routes/           Express routers + Zod request validation (includes bookingRoutes.js and
                     webhookRoutes.js for Paystack's own webhook)
   app.js            Express app wiring (no listen() - used directly by tests)

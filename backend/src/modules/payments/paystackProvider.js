@@ -100,4 +100,104 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   return expected === signatureHeader;
 }
 
-module.exports = { initializeCharge, verifyCharge, verifyWebhookSignature };
+/**
+ * Pays a Renter out via Paystack's Transfer API - a real two-step flow:
+ *   1. POST /transferrecipient - registers (or re-registers) the Renter's bank account as a
+ *      "transfer recipient" and gets back a recipient_code.
+ *   2. POST /transfer - actually moves money to that recipient_code.
+ * Paystack does let you cache a recipient_code and skip step 1 on repeat payouts, but this
+ * always re-creates the recipient first for simplicity (Paystack treats re-creating the same
+ * account/bank pair as a no-op, returning the existing recipient) - revisit if that turns out to
+ * add a real problem (e.g. a rate limit) once real payouts are actually happening.
+ *
+ * IMPORTANT / NOT YET VERIFIED, same caveat as initializeCharge/verifyCharge above, PLUS an
+ * extra one specific to this function:
+ *   `bankName` here is whatever free-text a Renter typed into their bank details (see
+ *   renterService.updateBankDetails) - e.g. "GTBank" or "Guaranty Trust Bank" - but Paystack's
+ *   /transferrecipient endpoint wants a `bank_code` (a short numeric code from Paystack's own
+ *   GET /bank list, e.g. "058" for GTBank), not a bank name. This function passes bankName
+ *   through as `bank_code` as a placeholder so the shape lines up with the docs, but that WILL
+ *   fail against the real API as written. Before switching PAYSTACK_MODE to 'paystack':
+ *   4. Either (a) call GET /bank once, build a name-to-code lookup table, and store the real
+ *      bank_code on the renters row when bank details are submitted, instead of/alongside the
+ *      free-text bank name; or (b) resolve bankName to a bank_code here at call time.
+ *   5. Confirm whether Paystack's transfer requires the platform to be whitelisted/approved for
+ *      live transfers first (their docs describe an approval step for the Transfers API on some
+ *      account tiers) - this has not been checked.
+ */
+async function initiateTransfer({ amountKobo, accountNumber, bankName, accountName, reference, reason }) {
+  const { secretKey, baseUrl } = config.payments.paystack;
+  if (!secretKey) {
+    throw new Error(
+      'PAYSTACK_SECRET_KEY is not set. Set PAYSTACK_MODE=mock in .env until real Paystack ' +
+        'credentials are available.'
+    );
+  }
+
+  const recipientResponse = await fetch(`${baseUrl}/transferrecipient`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'nuban',
+      name: accountName,
+      account_number: accountNumber,
+      // See the caveat above - this is a placeholder, not a real Paystack bank_code yet.
+      bank_code: bankName,
+      currency: 'NGN',
+    }),
+  });
+  const recipientBody = await recipientResponse.json();
+
+  if (!recipientResponse.ok || !recipientBody.status) {
+    return {
+      provider: 'paystack',
+      status: 'failed',
+      transferReference: null,
+      raw: { step: 'transferrecipient', ...recipientBody },
+    };
+  }
+
+  const recipientCode = recipientBody.data.recipient_code;
+
+  const transferResponse = await fetch(`${baseUrl}/transfer`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      source: 'balance',
+      amount: amountKobo,
+      recipient: recipientCode,
+      reference,
+      reason,
+    }),
+  });
+  const transferBody = await transferResponse.json();
+
+  if (!transferResponse.ok || !transferBody.status) {
+    return {
+      provider: 'paystack',
+      status: 'failed',
+      transferReference: reference,
+      raw: { step: 'transfer', ...transferBody },
+    };
+  }
+
+  // Paystack's transfer statuses include 'success' (instant, common for balance-funded
+  // transfers) and 'pending'/'otp' (require further action, e.g. OTP finalization on some
+  // account types) - only 'success' is treated as a completed payout here; anything else is
+  // surfaced as a failure so it lands in admin review rather than being silently assumed to have
+  // gone through. Revisit if TalcTech's Paystack account ever requires OTP-finalized transfers.
+  return {
+    provider: 'paystack',
+    status: transferBody.data.status === 'success' ? 'success' : 'failed',
+    transferReference: reference,
+    raw: transferBody.data,
+  };
+}
+
+module.exports = { initializeCharge, verifyCharge, verifyWebhookSignature, initiateTransfer };

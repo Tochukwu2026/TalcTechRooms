@@ -39,6 +39,18 @@ function generateReference(prefix = 'ttr') {
 }
 
 /**
+ * Pays a Renter out via Paystack's Transfer API (spec/decisions-and-phasing.md > Renter
+ * Payout) - deliberately NOT the instant-split feature (subaccounts + split_code), which the
+ * decisions log explicitly rules out. Used by src/modules/payout for both payout paths (Path
+ * A's held-until-9pm release and Path B's instant release on a no-refund cancellation).
+ * @param {{amountKobo:number, accountNumber:string, bankName:string, accountName:string, reference:string, reason:string}} params
+ * @returns {Promise<{provider:string, status:'success'|'failed', transferReference:string|null, raw:object}>}
+ */
+async function initiateTransfer({ amountKobo, accountNumber, bankName, accountName, reference, reason }) {
+  return provider().initiateTransfer({ amountKobo, accountNumber, bankName, accountName, reference, reason });
+}
+
+/**
  * Webhook signature check - only meaningful in real ('paystack') mode, since mock mode has no
  * real webhook secret and nothing will ever call the webhook route with a genuine signature in
  * dev/test. In mock mode this always passes, so the webhook route can still be exercised in
@@ -49,4 +61,10 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   return paystackProvider.verifyWebhookSignature(rawBody, signatureHeader);
 }
 
-module.exports = { initializeCharge, verifyCharge, generateReference, verifyWebhookSignature };
+module.exports = {
+  initializeCharge,
+  verifyCharge,
+  generateReference,
+  verifyWebhookSignature,
+  initiateTransfer,
+};

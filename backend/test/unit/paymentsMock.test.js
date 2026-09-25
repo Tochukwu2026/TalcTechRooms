@@ -36,3 +36,26 @@ test('mock provider: verifying an unknown reference returns not_found rather tha
   const verified = await mockProvider.verifyCharge('never_initialized_ref');
   assert.equal(verified.status, 'not_found');
 });
+
+test('mock provider: a bank account number NOT ending in 0 deterministically simulates a successful transfer', async () => {
+  const result = await mockProvider.initiateTransfer({
+    amountKobo: 1700000,
+    accountNumber: '0123456789',
+    bankName: 'GTBank',
+    accountName: 'Jane Renter',
+    reference: 'test_payout_ref_success_1',
+  });
+  assert.equal(result.status, 'success');
+  assert.equal(result.transferReference, 'test_payout_ref_success_1');
+});
+
+test('mock provider: a bank account number ending in 0 deterministically simulates a failed transfer', async () => {
+  const result = await mockProvider.initiateTransfer({
+    amountKobo: 1700000,
+    accountNumber: '0123456780',
+    bankName: 'GTBank',
+    accountName: 'Jane Renter',
+    reference: 'test_payout_ref_fail_1',
+  });
+  assert.equal(result.status, 'failed');
+});

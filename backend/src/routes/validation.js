@@ -136,6 +136,31 @@ const initializeBookingSchema = z
     path: ['checkOut'],
   });
 
+// See renters.bank_name/bank_account_number/bank_account_name in
+// src/db/migrations/0003_renters_customers.up.sql. Free-text bank name for now - see the
+// bank_code caveat in src/modules/payments/paystackProvider.js.
+const bankDetailsSchema = z.object({
+  bankName: z.string().min(2).max(200),
+  bankAccountNumber: z.string().min(6).max(20),
+  bankAccountName: z.string().min(2).max(200),
+});
+
+// A Customer filing a problem/fraud report on check-in day (Path A) - see Renter Payout in
+// spec/decisions-and-phasing.md. `notes` is optional free text (e.g. "listing doesn't match
+// photos") for the Admin reviewing the case.
+const reportProblemSchema = z.object({
+  notes: z.string().min(1).max(2000).optional(),
+});
+
+// Matches admin_case_status/the two ways an Admin can resolve a flagged booking - see
+// admin_review_cases in src/db/migrations/0006_bookings.up.sql and the Renter Payout section of
+// the decisions log ("Admin resolves manually... before releasing funds or processing a
+// refund").
+const resolveReviewCaseSchema = z.object({
+  resolution: z.enum(['release_payout', 'refund_customer']),
+  notes: z.string().min(1).max(2000).optional(),
+});
+
 const updatePriceCapSchema = z.object({
   capNaira: z.number().positive().max(10000000),
 });
@@ -201,6 +226,9 @@ module.exports = {
   availabilityQuerySchema,
   checkoutPreviewQuerySchema,
   initializeBookingSchema,
+  bankDetailsSchema,
+  reportProblemSchema,
+  resolveReviewCaseSchema,
   updatePriceCapSchema,
   createPriceCapSchema,
   updateSettingSchema,

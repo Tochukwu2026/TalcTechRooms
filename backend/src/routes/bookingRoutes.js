@@ -3,6 +3,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const { authenticate, requireRole } = require('../middleware/auth');
 const ApiError = require('../utils/ApiError');
 const bookingService = require('../modules/booking/bookingService');
+const payoutService = require('../modules/payout/payoutService');
+const { reportProblemSchema, validateBody } = require('./validation');
 
 const router = Router();
 
@@ -46,6 +48,36 @@ router.get(
   asyncHandler(async (req, res) => {
     const booking = await bookingService.getBookingForCustomer(Number(req.params.id), req.user.id);
     res.json(booking);
+  })
+);
+
+// Renter payout, Path A - see spec/decisions-and-phasing.md > Renter Payout. Both actions are
+// only available on the Customer's own active booking (payoutService enforces ownership).
+router.post(
+  '/:id/confirm-check-in',
+  asyncHandler(async (req, res) => {
+    const result = await payoutService.confirmCheckIn(Number(req.params.id), req.user.id);
+    res.json(result);
+  })
+);
+
+router.post(
+  '/:id/report-problem',
+  validateBody(reportProblemSchema),
+  asyncHandler(async (req, res) => {
+    const result = await payoutService.reportProblem(Number(req.params.id), req.user.id, req.body.notes);
+    res.status(201).json(result);
+  })
+);
+
+// Renter payout, Path B - instant release on a confirmed no-refund cancellation (or a Rent-only
+// refund if still within the >=7-day window) - see spec/decisions-and-phasing.md >
+// Cancellation/Refund and Renter Payout.
+router.post(
+  '/:id/cancel',
+  asyncHandler(async (req, res) => {
+    const result = await payoutService.cancelBooking(Number(req.params.id), req.user.id);
+    res.json(result);
   })
 );
 

@@ -62,4 +62,28 @@ async function verifyCharge(reference) {
   };
 }
 
-module.exports = { initializeCharge, verifyCharge };
+// Same trick as the mock ID-verification provider (a document number ending in '0' fails):
+// a Renter bank account number ending in '0' deterministically simulates a failed transfer,
+// so payout failure-handling (src/modules/payout) can be built and tested without real bank
+// details or a real Paystack Transfer call.
+function simulatesTransferFailure(accountNumber) {
+  return /0$/.test(String(accountNumber || ''));
+}
+
+async function initiateTransfer({ amountKobo, accountNumber, bankName, accountName, reference }) {
+  const willFail = simulatesTransferFailure(accountNumber);
+  return {
+    provider: 'mock',
+    status: willFail ? 'failed' : 'success',
+    transferReference: reference,
+    raw: {
+      note: 'mock provider - no real API call made',
+      amountKobo,
+      accountNumber,
+      bankName,
+      accountName,
+    },
+  };
+}
+
+module.exports = { initializeCharge, verifyCharge, initiateTransfer };
