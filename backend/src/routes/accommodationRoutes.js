@@ -12,12 +12,14 @@ const {
   availabilityQuerySchema,
   checkoutPreviewQuerySchema,
   initializeBookingSchema,
+  bookViewingSchema,
   validateBody,
   validateQuery,
 } = require('./validation');
 const accommodationService = require('../modules/accommodations/accommodationService');
 const checkoutService = require('../modules/checkout/checkoutService');
 const bookingService = require('../modules/booking/bookingService');
+const viewingService = require('../modules/viewings/viewingService');
 
 const router = Router();
 
@@ -107,6 +109,38 @@ router.post(
       Number(req.params.id),
       req.body
     );
+    res.status(201).json(result);
+  })
+);
+
+// --- Executive Feature Viewing bookings (Customer, Executive tier only - see viewingService
+// for the 403 gate) ---
+
+router.get(
+  '/:id/viewings/video-availability',
+  authenticate,
+  requireRole('customer'),
+  asyncHandler(async (req, res) => {
+    res.json(await viewingService.getVideoAvailability(Number(req.params.id), req.user.id));
+  })
+);
+
+router.get(
+  '/:id/viewings/live-availability',
+  authenticate,
+  requireRole('customer'),
+  asyncHandler(async (req, res) => {
+    res.json(await viewingService.getLiveAvailability(Number(req.params.id), req.user.id));
+  })
+);
+
+router.post(
+  '/:id/viewings',
+  authenticate,
+  requireRole('customer'),
+  validateBody(bookViewingSchema),
+  asyncHandler(async (req, res) => {
+    const result = await viewingService.bookViewing(req.user.id, Number(req.params.id), req.body);
     res.status(201).json(result);
   })
 );

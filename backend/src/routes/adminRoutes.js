@@ -13,12 +13,14 @@ const {
   updateSetting,
 } = require('../modules/admin/adminService');
 const payoutService = require('../modules/payout/payoutService');
+const viewingService = require('../modules/viewings/viewingService');
 const {
   validateBody,
   updatePriceCapSchema,
   createPriceCapSchema,
   updateSettingSchema,
   resolveReviewCaseSchema,
+  assignStaffSchema,
 } = require('./validation');
 
 const router = Router();
@@ -121,6 +123,25 @@ router.patch(
   asyncHandler(async (req, res) => {
     const result = await payoutService.resolveReviewCase(Number(req.params.id), req.user.id, req.body);
     res.json(result);
+  })
+);
+
+// --- Live/Video Viewing staff assignment queue ---
+// See spec/decisions-and-phasing.md > Platform & Stack > Admin Portal / Staff access.
+
+router.get(
+  '/viewings',
+  asyncHandler(async (req, res) => {
+    const { status, unassignedOnly } = req.query;
+    res.json(await viewingService.listViewingsForAdmin({ status, unassignedOnly: unassignedOnly === 'true' }));
+  })
+);
+
+router.patch(
+  '/viewings/:id/assign',
+  validateBody(assignStaffSchema),
+  asyncHandler(async (req, res) => {
+    res.json(await viewingService.assignStaff(Number(req.params.id), req.body.staffUserId));
   })
 );
 

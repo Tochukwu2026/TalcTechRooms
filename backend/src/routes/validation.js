@@ -161,6 +161,19 @@ const resolveReviewCaseSchema = z.object({
   notes: z.string().min(1).max(2000).optional(),
 });
 
+// Executive Feature Viewing booking - see viewingService.bookViewing. scheduledDate's own
+// window/availability/quota checks happen in the service (they depend on DB state), not here.
+const bookViewingSchema = z.object({
+  viewingType: z.enum(['live', 'video']),
+  scheduledDate: isoDate,
+});
+
+// staffUserId: coerced, since a BIGINT id (users.id) commonly round-trips through the client as
+// a string (see the BIGINT-as-string note in payoutService.js) - accept either.
+const assignStaffSchema = z.object({
+  staffUserId: z.coerce.number().int().positive(),
+});
+
 const updatePriceCapSchema = z.object({
   capNaira: z.number().positive().max(10000000),
 });
@@ -229,6 +242,8 @@ module.exports = {
   bankDetailsSchema,
   reportProblemSchema,
   resolveReviewCaseSchema,
+  bookViewingSchema,
+  assignStaffSchema,
   updatePriceCapSchema,
   createPriceCapSchema,
   updateSettingSchema,

@@ -173,7 +173,48 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     and the >=7-day-refundable branches, a mock transfer failure landing in `admin_review` rather
     than being silently lost, ownership/role checks, double-confirm rejection, and the bank-
     details endpoint).
-- 67 automated tests (unit + integration, run against the real database, not mocked) - all
+- **Live/Video Viewing booking system, BUILT AND TESTED (2026-09-25)** - the Executive Customer
+  "Book Executive Feature Table" from spec/requirements-v1.md, backend only for this pass (the
+  founder's explicit choice - Admin-dashboard UI for staff assignment is a follow-up). No new
+  migration needed - `viewing_bookings` and `viewing_availability` already existed from Phase 1.
+  - **Video Viewing**: `GET /accommodations/:id/viewings/video-availability` (Executive Customer
+    only) returns the next 30 days, no restriction on which date - any date in the window can be
+    booked. `POST /accommodations/:id/viewings` with `{ viewingType: 'video', scheduledDate }`
+    enforces the 1-per-listing weekly limit, measured as a **rolling 7 days from the Customer's
+    most recent (non-cancelled) booking for that listing** - the founder's explicit choice over a
+    calendar-week definition - returning the spec's exact message ("You have exceeded your weekly
+    limit for this location.") on a repeat within the window. No cap across different listings.
+  - **Live Viewing**: `GET /accommodations/:id/viewings/live-availability` returns only the dates
+    the Renter marked via the existing viewing-availability endpoint that aren't already booked -
+    everything else is simply absent from the list ("dead" per spec). Booking one of these dates
+    enforces both monthly caps (1 per listing, 3 total across all listings per calendar month)
+    and is exclusive: a booked date is removed from every other Executive Customer's availability
+    list, backed by both an application check and the existing partial unique index on
+    `viewing_bookings` so a race between two simultaneous requests can't double-book it.
+  - **Cancellation**: `POST /customers/me/viewings/:id/cancel` (own viewings only) - for a Live
+    Viewing, also frees the date back up so it can be rebooked; not explicit in the spec, but
+    leaving a cancelled booking's date permanently dead seemed clearly unintended.
+  - **Admin/Staff assignment**: `GET /admin/review-cases`-style queue at `GET /admin/viewings`
+    (`?unassignedOnly=true` for the common case) and `PATCH /admin/viewings/:id/assign` with
+    `{ staffUserId }`. New `npm run create-staff` (mirrors `create-admin`) provisions Staff
+    accounts - the `staff` role already existed in the schema but had no way to create one.
+    `GET /staff/viewings/me` and `POST /staff/viewings/:id/complete` (own assignments only) are
+    Staff's own limited view, on a new `staffRoutes.js`/`/staff` mount.
+  - **Deliberately NOT sent**: the spec's "confirmation emailed and sent via SMS" on viewing
+    bookings - Termii isn't wired up to anything anywhere in this codebase yet (only the
+    `notifications_log` table exists), so this stays consistent with real booking creation, which
+    doesn't send them either.
+  - **Assumption made, not asked about**: viewing bookings do NOT require the Customer's ID
+    verification to have passed, unlike real (paid) booking creation - a viewing isn't a monetary
+    transaction and the spec doesn't call for this gate. Flagging in case the founder wants it
+    added for consistency.
+  - Test coverage: 14 new integration tests (Video Viewing booking + the weekly-limit rejection
+    and its rolling-window reset + no cross-listing cap, a Regular Customer's 403, Live Viewing
+    booking + availability removal + the double-booking 409 + an unmarked-date 404 + both monthly
+    caps + cancellation freeing the date back up + cross-customer cancel rejection, and the full
+    Admin-assign/Staff-complete path including a wrong-staff-member rejection and a non-staff
+    assignment 404).
+- 81 automated tests (unit + integration, run against the real database, not mocked) - all
   passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -193,7 +234,8 @@ Paystack *live* integrations (all providers are written but untested against rea
 see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
 `src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js` -
 Paystack's Transfer (payout) side has an additional unresolved `bank_code` caveat, see below),
-staff assignment for viewings, and the mobile app.
+an Admin-dashboard UI page for viewing-staff assignment (the backend endpoints now exist - see
+"Live/Video Viewing" above), and the mobile app.
 
 ## Requirements
 
@@ -223,6 +265,7 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
 | `npm run migrate:down` | Roll back the single most recent migration |
 | `npm run migrate:status` | List applied vs. pending migrations |
 | `npm run seed` | Load seed data (price caps, admin settings, amenities) |
+| `npm run create-staff -- --email <email> --password <password> --name "Full Name"` | Create (or reset the password of) a Staff account - no public self-registration endpoint, same as `create-admin` |
 | `npm run evaluate-payouts` | Runs the 9pm-WAT check-in-day payout evaluation once (see "Renter Payout" below). CLI only, no HTTP endpoint - meant to be invoked once daily by an external scheduler (cron, GCP Cloud Scheduler, etc.) once one is set up; not wired to any scheduler yet |
 | `npm test` | Run the full unit + integration test suite (needs a real Postgres reachable via `DATABASE_URL`, ideally a disposable dev/test database - the integration tests `DELETE` rows from most tables between test cases) |
 
@@ -314,10 +357,11 @@ src/
     checkout/       Rent/Admin-Costs/VAT/commission math + admin_settings lookup
     booking/        availability math + real booking creation (Paystack charge -> bookings row)
     payout/         two-path Renter payout (confirm-check-in/report-problem/cancel/admin resolve)
+    viewings/       Live/Video Viewing booking + quota rules + Admin/Staff assignment
   jobs/             standalone scripts, not HTTP routes (evaluateCheckInDayPayouts.js - the 9pm
                     WAT check-in-day payout evaluation, run via `npm run evaluate-payouts`)
-  routes/           Express routers + Zod request validation (includes bookingRoutes.js and
-                    webhookRoutes.js for Paystack's own webhook)
+  routes/           Express routers + Zod request validation (includes bookingRoutes.js,
+                    webhookRoutes.js for Paystack's own webhook, and staffRoutes.js)
   app.js            Express app wiring (no listen() - used directly by tests)
   server.js         actual process entrypoint
 test/
