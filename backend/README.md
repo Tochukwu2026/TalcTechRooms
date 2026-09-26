@@ -335,7 +335,41 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   - Test coverage: 3 new integration tests - no header rejected (401), wrong secret rejected
     (401), correct secret runs the real evaluation end-to-end (flags a genuinely overdue booking,
     same assertions as the existing direct-function-call test in `payoutFlow.test.js`).
-- 93 automated backend tests (unit + integration, run against the real database, not mocked) -
+- **Termii live integration (SMS + email notifications), BUILT (2026-09-26)** - "confirmation
+  emailed and sent via SMS" (spec's exact wording, both for a real booking and for a Live/Video
+  Viewing) had no provider wired up anywhere in this codebase until now - only the
+  `notifications_log` table existed. Scoped by the founder's explicit confirmation: SMS + email
+  both, via Termii, wired to real booking + viewing confirmations, mock-tested now and switchable
+  to live once Termii dashboard setup is done.
+  - **New provider-agnostic `src/modules/notifications/`** (`mock`/`termii` modes, same pattern
+    as payments/storage/idVerification): `sendSms`/`sendEmail` (low-level, log to
+    `notifications_log` either way) plus two composed, spec-shaped functions -
+    `notifyBookingConfirmation` and `notifyViewingConfirmation` - that callers actually use.
+  - `termiiProvider.js` covers BOTH of Termii's messaging products: SMS via their Messaging API
+    (`POST /api/sms/send`) and email via their template-based Email Product Notification endpoint
+    (`POST /api/templates/send-email`). **Not yet tested against real credentials** (same caveat
+    pattern as every other live provider in this codebase) - see the caveat at the top of that
+    file for exactly what to verify before flipping `TERMII_MODE` to `termii`.
+  - **Termii's email endpoint is template-based, not free text** - it requires an email template
+    and an "email configuration" pre-created in the Termii dashboard (`TERMII_EMAIL_TEMPLATE_ID` /
+    `TERMII_EMAIL_CONFIGURATION_ID`), unlike the SMS endpoint. This is a one-time manual setup step
+    only the founder can do (same as getting Paystack/Prembly keys) - Claude cannot create these.
+  - **Cost logging**: SMS is logged at `cost_naira = 5.90` (`config.business.smsCostNaira`, the
+    same confirmed Termii cost already priced into the Customer's Admin Costs at checkout - this
+    is bookkeeping, not a second charge). Email is logged at `cost_naira = 0` - no email pricing
+    has ever been confirmed/decided (only SMS was priced with Termii), so no number is guessed.
+  - **Wired into**: `bookingService.finalizeBooking`'s `'created'` outcome (real booking
+    confirmation) and `viewingService.bookViewing` (both Live and Video Viewing confirmation).
+    A notification failure never blocks or rolls back the booking/viewing it's confirming - every
+    send is caught and logged to `notifications_log` as `'failed'` rather than thrown, the same
+    "never let a side-channel failure break the main flow" principle already used for a failed
+    Renter payout transfer.
+  - Test coverage: 4 new unit tests for the mock provider (SMS success/failure by phone-number
+    convention, email success/failure by the existing `+fail` convention) and 3 new integration
+    tests (a real booking confirmation logs a sent SMS + sent email; a phone ending in `0` logs a
+    failed SMS without blocking the booking itself; a Video Viewing confirmation logs a sent SMS +
+    sent email).
+- 100 automated backend tests (unit + integration, run against the real database, not mocked) -
   all passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -351,8 +385,8 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
 **Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list):
 Termii/Prembly/Paystack *live* integrations (all providers are written but untested against real
 credentials - see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
-`src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js`), and the
-mobile app.
+`src/modules/storage/gcsProvider.js`, `src/modules/payments/paystackProvider.js`, and
+`src/modules/notifications/termiiProvider.js`), and the mobile app.
 
 ## Requirements
 
@@ -436,6 +470,31 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
   credentials, same as everything else on this list - see the comment on `initiateTransfer` in
   `paystackProvider.js`.
 
+## Notifications: mock vs. real Termii
+
+`TERMII_MODE` in `.env` controls which provider `src/modules/notifications` uses:
+
+- `mock` (default): no real API calls. Deterministic instead: an SMS to a phone number ending in
+  `0` simulates a failed send; an email to an address containing `+fail` simulates a failed send
+  (same convention as the payments/ID-verification mocks); everything else simulates success.
+- `termii`: calls the real Termii API for both SMS (Messaging API) and email (Email Product
+  Notification). Requires `TERMII_API_KEY` and `TERMII_SENDER_ID` (an alphanumeric SMS sender ID
+  you register/get approved in your Termii dashboard) in `.env` for SMS; **for email**, you must
+  also create an email template and an "email configuration" in the Termii dashboard first and
+  set `TERMII_EMAIL_TEMPLATE_ID` / `TERMII_EMAIL_CONFIGURATION_ID` - Termii's email endpoint is
+  template-based, not free text, so there's no way around this one-time setup step. **This has
+  not been tested against real credentials** - read the caveat at the top of
+  `src/modules/notifications/termiiProvider.js` before switching a real environment over to it.
+- Fires on the two spec-required events: a real booking confirmation
+  (`bookingService.finalizeBooking`) and a Live/Video Viewing confirmation
+  (`viewingService.bookViewing`). A notification failure never blocks or rolls back the
+  booking/viewing itself - every send is logged to `notifications_log` (`'sent'` or `'failed'`),
+  never thrown.
+- SMS cost (`config.business.smsCostNaira`, ₦5.90 - Termii's confirmed flat per-transaction cost)
+  is logged for accounting; this is the same cost already charged to the Customer at checkout as
+  part of Admin Costs, not a second charge. Email is logged at `cost_naira = 0` - no email
+  pricing has ever been decided (only SMS was priced with Termii).
+
 ## Renter Payout: the two-path hold/release system
 
 See `spec/decisions-and-phasing.md` > Business Rules > Renter Payout for the full rationale (why
@@ -478,6 +537,7 @@ src/
     booking/        availability math + real booking creation (Paystack charge -> bookings row)
     payout/         two-path Renter payout (confirm-check-in/report-problem/cancel/admin resolve)
     viewings/       Live/Video Viewing booking + quota rules + Admin/Staff assignment
+    notifications/  provider-agnostic interface + mock/termii providers (SMS + email confirmations)
   jobs/             evaluateCheckInDayPayouts.js - the 9pm WAT check-in-day payout evaluation;
                     callable via the CLI (`npm run evaluate-payouts`) or over HTTP (see routes/
                     internalRoutes.js) - both call the same exported function

@@ -5,12 +5,12 @@
 // 0007_viewing_bookings_and_notifications.up.sql - so no new migration is needed here.
 //
 // Scope for this pass, per the founder's explicit choice (2026-09-25): backend only (booking +
-// quota rules + Admin/Staff assignment endpoints), no new Admin-dashboard UI page yet. Email/SMS
-// confirmations (the spec's "confirmation emailed and sent via SMS") are NOT sent here, for the
-// same reason booking creation doesn't send them either - Termii isn't wired up to anything yet
-// anywhere in this codebase (mock notification module doesn't exist; only the notifications_log
-// table does) - so this stays consistent with the rest of the app rather than being a special
-// case. Revisit once Termii is actually integrated.
+// quota rules + Admin/Staff assignment endpoints), no new Admin-dashboard UI page yet.
+//
+// Email/SMS confirmations (BUILT 2026-09-26): on a successful bookViewing() call, fires
+// notifications.notifyViewingConfirmation (SMS + email via Termii, mock mode by default) per
+// spec's "On booking, confirmation emailed and sent via SMS" (both Live and Video Viewing) -
+// see src/modules/notifications.
 //
 // Gating: "Executive Feature Booking Tab" is spec'd as "active only for Executive Customers;
 // dead/disabled for Regular Customers" - enforced here as a hard 403 on both the availability
@@ -21,6 +21,7 @@
 
 const { pool, withTransaction } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
+const notifications = require('../notifications');
 
 const VIDEO_WINDOW_DAYS = 30; // "Shows availability for the next 30 days for that listing."
 const VIDEO_WEEKLY_LIMIT_DAYS = 7; // "1 Video Viewing per location per week" - measured from the
@@ -167,7 +168,7 @@ function toViewingResponse(row) {
  * same listing/date can't double-book it).
  */
 async function bookViewing(customerUserId, accommodationId, { viewingType, scheduledDate }) {
-  return withTransaction(async (client) => {
+  const viewing = await withTransaction(async (client) => {
     await assertExecutiveCustomer(client, customerUserId);
     await assertAccommodationActive(client, accommodationId);
 
@@ -221,6 +222,27 @@ async function bookViewing(customerUserId, accommodationId, { viewingType, sched
     // Unreachable given Zod validation, but defensive against a future caller bypassing it.
     throw new ApiError(400, `Unknown viewing type "${viewingType}".`);
   });
+
+  // Fires after the transaction has committed, not inside it - this is a network call to an
+  // external provider (or, in mock mode, still a DB write of its own to notifications_log), and
+  // shouldn't hold the viewing_bookings/viewing_availability row locks open any longer than
+  // necessary. A notification failure never blocks the response - see notifications/index.js.
+  const { rows: userRows } = await pool.query(
+    `SELECT u.id, u.email, u.phone, u.full_name AS "fullName", a.location_text AS "locationText"
+     FROM users u
+     JOIN accommodations a ON a.id = $2
+     WHERE u.id = $1`,
+    [customerUserId, accommodationId]
+  );
+  if (userRows.length > 0) {
+    await notifications.notifyViewingConfirmation({
+      user: userRows[0],
+      viewing,
+      accommodationLocationText: userRows[0].locationText,
+    });
+  }
+
+  return viewing;
 }
 
 async function listMyViewings(customerUserId) {

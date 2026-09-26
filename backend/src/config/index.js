@@ -55,6 +55,22 @@ const config = {
     },
   },
 
+  notifications: {
+    // 'mock' simulates SMS/email sends with no real API calls, so booking/viewing confirmations
+    // can be built and tested before real Termii credentials exist - see src/modules/notifications.
+    mode: required('TERMII_MODE', 'mock'),
+    termii: {
+      apiKey: process.env.TERMII_API_KEY || '',
+      // Alphanumeric SMS sender ID (3-11 chars) registered/approved in the Termii dashboard.
+      senderId: process.env.TERMII_SENDER_ID || '',
+      // Email is template-based on Termii's side - both of these must be created in the Termii
+      // dashboard first; there's no way to send a real Termii email without them.
+      emailConfigurationId: process.env.TERMII_EMAIL_CONFIGURATION_ID || '',
+      emailTemplateId: process.env.TERMII_EMAIL_TEMPLATE_ID || '',
+      baseUrl: required('TERMII_BASE_URL', 'https://api.ng.termii.com'),
+    },
+  },
+
   scheduler: {
     // Shared secret an external scheduler (GCP Cloud Scheduler, cron, etc.) must send as
     // X-Scheduler-Secret to trigger POST /internal/evaluate-payouts (see routes/internalRoutes.js

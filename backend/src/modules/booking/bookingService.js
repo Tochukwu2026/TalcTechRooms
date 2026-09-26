@@ -16,8 +16,13 @@
 //      triggered manual "verify my payment" check) - safe to call more than once for the same
 //      reference; the second call is a no-op that returns the already-created booking.
 //
-// Renter payout (the two-path 9pm-WAT hold/release logic) is NOT built yet - every booking
-// created here just sits at payout_status='held' (Path A's starting state) until that's built.
+// Every booking created here starts at payout_status='held' (Path A's starting state) - see
+// src/modules/payout/payoutService.js for the two-path 9pm-WAT hold/release logic that acts on
+// it from there.
+//
+// Booking confirmation notification (BUILT 2026-09-26): on a successful 'created' outcome, fires
+// notifications.notifyBookingConfirmation (SMS + email via Termii, mock mode by default) per
+// spec's "Booking confirmation also emailed and sent via SMS" - see src/modules/notifications.
 //
 // Availability-conflict refund (BUILT 2026-09-26): if the units are gone by finalize time (a
 // race between two Customers' initialize calls - see the conflict case below), the Customer's
@@ -35,6 +40,7 @@ const payments = require('../payments');
 const availability = require('./availabilityService');
 const checkoutService = require('../checkout/checkoutService');
 const { toKobo } = require('../checkout/checkoutMath');
+const notifications = require('../notifications');
 
 /**
  * Per spec/decisions-and-phasing.md > Business Rules > ID verification: a Customer whose ID
@@ -226,7 +232,28 @@ async function finalizeBooking(reference) {
     ]
   );
 
-  return { status: 'created', booking: toBookingResponse(rows[0]) };
+  const booking = toBookingResponse(rows[0]);
+
+  // "After payment -> Confirmation Page ... Booking confirmation also emailed and sent via SMS"
+  // (spec/requirements-v1.md). A notification failure never blocks the response - the booking
+  // itself is already real and paid-for by this point; see notifications/index.js's header
+  // comment for why every send is caught and logged rather than thrown.
+  const { rows: userRows } = await pool.query(
+    `SELECT u.id, u.email, u.phone, u.full_name AS "fullName", a.location_text AS "locationText"
+     FROM users u
+     JOIN accommodations a ON a.id = $2
+     WHERE u.id = $1`,
+    [meta.customerUserId, meta.accommodationId]
+  );
+  if (userRows.length > 0) {
+    await notifications.notifyBookingConfirmation({
+      user: userRows[0],
+      booking,
+      accommodationLocationText: userRows[0].locationText,
+    });
+  }
+
+  return { status: 'created', booking };
 }
 
 async function getBookingForCustomer(bookingId, customerUserId) {
