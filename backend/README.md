@@ -126,9 +126,10 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     logic exists, same as before - and TalcTech's 15% is simply recognized, no ledger entry
     needed). `POST /bookings/:id/report-problem` (Customer, optional `{ notes }`) instead holds
     the payout and opens an Admin review case (`reason='fraud_report'`). If a Customer does
-    neither, `src/jobs/evaluateCheckInDayPayouts.js` - a standalone script meant to be invoked
-    once daily at/after 9pm WAT by an external scheduler (`npm run evaluate-payouts`; see below) -
-    flags every still-`active`/`held` booking whose check-in date has arrived
+    neither, `src/jobs/evaluateCheckInDayPayouts.js` - invoked once daily at/after 9pm WAT either
+    from the CLI (`npm run evaluate-payouts`) or, since 2026-09-26, by a real external scheduler
+    hitting `POST /internal/evaluate-payouts` (see "Real scheduler wiring" above) - flags every
+    still-`active`/`held` booking whose check-in date has arrived
     (`reason='no_show_no_response'`). This job only ever flags - it never releases a payout,
     since by construction a booking it reaches is one the Customer didn't act on.
   - **Path B - instant on a confirmed no-refund cancellation**: `POST /bookings/:id/cancel`
@@ -299,7 +300,42 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   - Test coverage: 6 new unit tests for `resolveBankCode` (exact match, a partial/substring match
     for when Paystack's real name has extra words ours doesn't, no match, and malformed input) and
     for `NIGERIAN_BANK_NAMES` itself (no empty/duplicate entries).
-- 90 automated backend tests (unit + integration, run against the real database, not mocked) -
+- **Real scheduler wiring for the 9pm-WAT payout evaluation job, BUILT (2026-09-26)** - closes
+  the one gap the two-path Renter Payout milestone deliberately left open ("Everything except
+  real scheduling"). `src/jobs/evaluateCheckInDayPayouts.js`'s exported function is unchanged;
+  what's new is a second, HTTP-triggerable way to call it, because GCP Cloud Run (the confirmed
+  hosting choice) runs request-driven services that scale to zero, so nothing on the box itself
+  can run a traditional cron entry or be reached over SSH the way a VM could.
+  - `POST /internal/evaluate-payouts` (new `src/routes/internalRoutes.js`, mounted at `/internal`
+    in `app.js`) calls `evaluateCheckInDayPayouts()` and returns its `{evaluatedDate,
+    flaggedBookingIds}` result as JSON.
+  - Guarded by a new `src/middleware/requireSchedulerSecret.js`, not JWT auth - there's no
+    scheduler "user" account, so this instead checks a shared secret sent as an
+    `X-Scheduler-Secret` header against `SCHEDULER_SECRET` (new env var, `config.scheduler.secret`
+    in `src/config/index.js`), using a constant-time comparison (same shape as the Paystack
+    webhook signature check in `webhookRoutes.js`). **The endpoint is closed by default** - if
+    `SCHEDULER_SECRET` is unset, every request 401s; it never falls open.
+  - The CLI script (`npm run evaluate-payouts`) still works exactly as before for manual/local
+    use - both paths call the same function, so there's exactly one place the actual evaluation
+    logic lives.
+  - To wire this to GCP Cloud Scheduler once the backend is deployed to Cloud Run:
+    ```bash
+    gcloud scheduler jobs create http evaluate-payouts \
+      --schedule="0 21 * * *" \
+      --time-zone="Africa/Lagos" \
+      --uri="https://<your-cloud-run-url>/internal/evaluate-payouts" \
+      --http-method=POST \
+      --headers="X-Scheduler-Secret=<the same value as your deployed SCHEDULER_SECRET>"
+    ```
+    (`Africa/Lagos` has no DST, so `21:00` there is always 9pm WAT.) The more "GCP-native"
+    alternative - Cloud Run requiring an authenticated invocation and Cloud Scheduler's HTTP
+    target signing the request with an OIDC token instead of a shared secret - needs no secret
+    management at all and is worth switching to once this is actually deployed; see the comment
+    at the top of `requireSchedulerSecret.js`.
+  - Test coverage: 3 new integration tests - no header rejected (401), wrong secret rejected
+    (401), correct secret runs the real evaluation end-to-end (flags a genuinely overdue booking,
+    same assertions as the existing direct-function-call test in `payoutFlow.test.js`).
+- 93 automated backend tests (unit + integration, run against the real database, not mocked) -
   all passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -312,8 +348,7 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   exists yet to be holding units against active bookings - revisit once bookings exist, so an
   in-progress booking's held units aren't silently overwritten by an edit.
 
-**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): real
-cron/scheduler wiring for the 9pm-WAT payout evaluation script (see "evaluate-payouts" below),
+**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list):
 Termii/Prembly/Paystack *live* integrations (all providers are written but untested against real
 credentials - see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
 `src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js`), and the
@@ -348,7 +383,7 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
 | `npm run migrate:status` | List applied vs. pending migrations |
 | `npm run seed` | Load seed data (price caps, admin settings, amenities) |
 | `npm run create-staff -- --email <email> --password <password> --name "Full Name"` | Create (or reset the password of) a Staff account - no public self-registration endpoint, same as `create-admin` |
-| `npm run evaluate-payouts` | Runs the 9pm-WAT check-in-day payout evaluation once (see "Renter Payout" below). CLI only, no HTTP endpoint - meant to be invoked once daily by an external scheduler (cron, GCP Cloud Scheduler, etc.) once one is set up; not wired to any scheduler yet |
+| `npm run evaluate-payouts` | Runs the 9pm-WAT check-in-day payout evaluation once, from the CLI. For real scheduler wiring, `POST /internal/evaluate-payouts` calls the exact same function over HTTP (see "Real scheduler wiring" above and "Renter Payout" below) - both exist; use whichever fits |
 | `npm test` | Run the full unit + integration test suite (needs a real Postgres reachable via `DATABASE_URL`, ideally a disposable dev/test database - the integration tests `DELETE` rows from most tables between test cases) |
 
 ## ID verification: mock vs. real Prembly
@@ -428,7 +463,8 @@ src/
     migrations/     numbered up/down SQL pairs - see src/db/migrate.js for the runner
     seeds/          seed SQL, run in filename order by src/db/seed.js
     pool.js         pg Pool + a withTransaction() helper
-  middleware/       auth (JWT) + role guards, central error handler
+  middleware/       auth (JWT) + role guards, central error handler, requireSchedulerSecret
+                    (shared-secret guard for the internal scheduler-only routes)
   modules/
     auth/           password hashing, JWT sign/verify, login service
     idVerification/ provider-agnostic interface + mock/prembly providers
@@ -442,10 +478,12 @@ src/
     booking/        availability math + real booking creation (Paystack charge -> bookings row)
     payout/         two-path Renter payout (confirm-check-in/report-problem/cancel/admin resolve)
     viewings/       Live/Video Viewing booking + quota rules + Admin/Staff assignment
-  jobs/             standalone scripts, not HTTP routes (evaluateCheckInDayPayouts.js - the 9pm
-                    WAT check-in-day payout evaluation, run via `npm run evaluate-payouts`)
+  jobs/             evaluateCheckInDayPayouts.js - the 9pm WAT check-in-day payout evaluation;
+                    callable via the CLI (`npm run evaluate-payouts`) or over HTTP (see routes/
+                    internalRoutes.js) - both call the same exported function
   routes/           Express routers + Zod request validation (includes bookingRoutes.js,
-                    webhookRoutes.js for Paystack's own webhook, and staffRoutes.js)
+                    webhookRoutes.js for Paystack's own webhook, staffRoutes.js, and
+                    internalRoutes.js for the scheduler-only /internal/evaluate-payouts endpoint)
   app.js            Express app wiring (no listen() - used directly by tests)
   server.js         actual process entrypoint
 test/

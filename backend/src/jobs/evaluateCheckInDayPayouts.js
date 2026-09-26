@@ -3,14 +3,20 @@
 // phasing.md > Renter Payout, Path A's third outcome: "Neither a confirmation nor a complaint by
 // 9pm -> the booking is flagged for Admin review rather than auto-paid".
 //
-// Deliberately NOT an HTTP endpoint and NOT wired to any real cron infrastructure - the founder's
-// own explicit choice ("A standalone script" over "Admin-triggered endpoint", 2026-09-25). This
-// is meant to be invoked once a day, at/after 9pm WAT, by an external scheduler once one exists
-// (a cron entry, GCP Cloud Scheduler hitting `node src/jobs/evaluateCheckInDayPayouts.js` via
-// SSH/a Cloud Run job, etc.) - see package.json's "evaluate-payouts" script for the exact command.
+// Two ways to run this, both calling the exact same function below:
+//   1. CLI: `node src/jobs/evaluateCheckInDayPayouts.js` / `npm run evaluate-payouts` - useful for
+//      running it by hand locally, or over SSH on a traditional VM. This was the founder's
+//      original explicit choice ("A standalone script" over "Admin-triggered endpoint",
+//      2026-09-25), back when real scheduling was still out of scope.
+//   2. HTTP: `POST /internal/evaluate-payouts` (see routes/internalRoutes.js), guarded by a shared
+//      secret (middleware/requireSchedulerSecret.js) - added 2026-09-26 for real scheduler wiring,
+//      since GCP Cloud Run (the confirmed hosting choice) runs request-driven services that scale
+//      to zero and cannot be invoked via SSH/direct CLI execution the way a VM could. A GCP Cloud
+//      Scheduler job hits this endpoint once a day, at/after 9pm WAT - see backend/README.md for
+//      the exact `gcloud scheduler jobs create http ...` command.
 // Running it more than once on the same day, or re-running it for a day already evaluated, is
-// safe: a booking that's no longer 'active'/'held' (already confirmed, reported, or cancelled)
-// is simply skipped, so there's no harm in the external scheduler firing this twice or the job
+// safe either way: a booking that's no longer 'active'/'held' (already confirmed, reported, or
+// cancelled) is simply skipped, so there's no harm in the scheduler firing this twice or the job
 // being retried after a crash.
 //
 // What it does NOT do: release any payout. Path A's release happens the moment the Customer

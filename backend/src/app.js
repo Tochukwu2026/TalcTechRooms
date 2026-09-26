@@ -11,6 +11,7 @@ const accommodationRoutes = require('./routes/accommodationRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const internalRoutes = require('./routes/internalRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 function createApp() {
@@ -44,6 +45,7 @@ function createApp() {
   app.use('/bookings', bookingRoutes);
   app.use('/webhooks', webhookRoutes);
   app.use('/staff', staffRoutes);
+  app.use('/internal', internalRoutes);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Not found.' });
