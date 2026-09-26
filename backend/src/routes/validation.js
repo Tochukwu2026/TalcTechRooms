@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { NIGERIAN_BANK_NAMES } = require('../modules/payments/nigerianBanks');
 
 const documentSchema = z.object({
   documentType: z.enum(['nin', 'passport', 'pvc']),
@@ -137,10 +138,12 @@ const initializeBookingSchema = z
   });
 
 // See renters.bank_name/bank_account_number/bank_account_name in
-// src/db/migrations/0003_renters_customers.up.sql. Free-text bank name for now - see the
-// bank_code caveat in src/modules/payments/paystackProvider.js.
+// src/db/migrations/0003_renters_customers.up.sql. bankName is now a fixed picklist of real
+// Nigerian banks (see nigerianBanks.js) rather than free text - resolved to Paystack's own
+// numeric bank_code at transfer time (src/modules/payments/paystackProvider.js), which fixes the
+// bank_name-vs-bank_code caveat that used to block real (non-mock) Renter payouts.
 const bankDetailsSchema = z.object({
-  bankName: z.string().min(2).max(200),
+  bankName: z.enum(NIGERIAN_BANK_NAMES),
   bankAccountNumber: z.string().min(6).max(20),
   bankAccountName: z.string().min(2).max(200),
 });

@@ -15,6 +15,7 @@
 
 const crypto = require('crypto');
 const config = require('../../config');
+const { resolveBankCode } = require('./nigerianBanks');
 
 async function initializeCharge({ amountKobo, email, reference, metadata }) {
   const { secretKey, baseUrl } = config.payments.paystack;
@@ -110,17 +111,20 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
  * account/bank pair as a no-op, returning the existing recipient) - revisit if that turns out to
  * add a real problem (e.g. a rate limit) once real payouts are actually happening.
  *
- * IMPORTANT / NOT YET VERIFIED, same caveat as initializeCharge/verifyCharge above, PLUS an
- * extra one specific to this function:
- *   `bankName` here is whatever free-text a Renter typed into their bank details (see
- *   renterService.updateBankDetails) - e.g. "GTBank" or "Guaranty Trust Bank" - but Paystack's
+ * IMPORTANT / NOT YET VERIFIED, same caveat as initializeCharge/verifyCharge above, PLUS an extra
+ * one specific to this function:
+ *   `bankName` here is one of the fixed picklist of real bank names a Renter chose from (see
+ *   nigerianBanks.js / validation.js's bankDetailsSchema) - e.g. "Zenith Bank" - but Paystack's
  *   /transferrecipient endpoint wants a `bank_code` (a short numeric code from Paystack's own
- *   GET /bank list, e.g. "058" for GTBank), not a bank name. This function passes bankName
- *   through as `bank_code` as a placeholder so the shape lines up with the docs, but that WILL
- *   fail against the real API as written. Before switching PAYSTACK_MODE to 'paystack':
- *   4. Either (a) call GET /bank once, build a name-to-code lookup table, and store the real
- *      bank_code on the renters row when bank details are submitted, instead of/alongside the
- *      free-text bank name; or (b) resolve bankName to a bank_code here at call time.
+ *   GET /bank list, e.g. "057" for Zenith Bank), not a bank name. FIXED 2026-09-26 (this used to
+ *   pass bankName straight through as bank_code, which would never have worked): this now calls
+ *   GET /bank itself, first, and resolves bankName to its real code via resolveBankCode() before
+ *   ever calling /transferrecipient - see nigerianBanks.js for the matching logic and its own
+ *   caveat about never having been run against a real Paystack response. A GET /bank call on
+ *   every single transfer is deliberately not cached across calls in this simple implementation -
+ *   Paystack's bank list changes rarely enough that this is wasteful but not wrong; worth adding
+ *   an in-process cache (with a sane TTL) once real transfer volume makes the extra round trip
+ *   worth avoiding.
  *   5. Confirm whether Paystack's transfer requires the platform to be whitelisted/approved for
  *      live transfers first (their docs describe an approval step for the Transfers API on some
  *      account tiers) - this has not been checked.
@@ -134,6 +138,33 @@ async function initiateTransfer({ amountKobo, accountNumber, bankName, accountNa
     );
   }
 
+  const bankListResponse = await fetch(`${baseUrl}/bank?country=nigeria`, {
+    headers: { Authorization: `Bearer ${secretKey}` },
+  });
+  const bankListBody = await bankListResponse.json();
+  if (!bankListResponse.ok || !bankListBody.status) {
+    return {
+      provider: 'paystack',
+      status: 'failed',
+      transferReference: null,
+      raw: { step: 'bank_lookup', ...bankListBody },
+    };
+  }
+
+  const bankCode = resolveBankCode(bankName, bankListBody.data);
+  if (!bankCode) {
+    // Don't guess - a wrong bank_code would misroute real money. Surface this as an ordinary
+    // transfer failure (payoutService already opens an Admin review case for any non-success
+    // here) rather than throwing, since this is a data-mismatch case an Admin can actually fix
+    // (e.g. Paystack renamed the bank since nigerianBanks.js was written), not a bug to crash on.
+    return {
+      provider: 'paystack',
+      status: 'failed',
+      transferReference: null,
+      raw: { step: 'bank_lookup', error: `No Paystack bank code found matching "${bankName}".` },
+    };
+  }
+
   const recipientResponse = await fetch(`${baseUrl}/transferrecipient`, {
     method: 'POST',
     headers: {
@@ -144,8 +175,7 @@ async function initiateTransfer({ amountKobo, accountNumber, bankName, accountNa
       type: 'nuban',
       name: accountName,
       account_number: accountNumber,
-      // See the caveat above - this is a placeholder, not a real Paystack bank_code yet.
-      bank_code: bankName,
+      bank_code: bankCode,
       currency: 'NGN',
     }),
   });

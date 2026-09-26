@@ -277,7 +277,29 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     test (two Customers racing for the last unit - the first finalizes and gets a real booking,
     the second gets `availability_conflict_refunded` and a `refunds` row for the full amount with
     `booking_id = NULL`).
-- 85 automated backend tests (unit + integration, run against the real database, not mocked) -
+- **Real Paystack Transfer bank-code fix, BUILT (2026-09-26)** - resolves the unresolved caveat
+  flagged at the top of `paystackProvider.js`'s `initiateTransfer` since the two-path Renter
+  payout was first built: it used to pass a Renter's free-text bank name straight through as
+  Paystack's required numeric `bank_code`, which would never have worked against the real API.
+  - `src/modules/payments/nigerianBanks.js` (new) holds `NIGERIAN_BANK_NAMES` - a fixed picklist
+    of 20 real Nigerian banks a Renter can choose from (Access Bank, Zenith Bank, GTBank, etc.) -
+    and a pure `resolveBankCode(bankName, paystackBankList)` matching function.
+  - `bankDetailsSchema` (`validation.js`) now restricts `bankName` to `NIGERIAN_BANK_NAMES` via a
+    Zod enum, instead of accepting free text - `renters.bank_name` itself stays a plain TEXT
+    column (no migration needed), since the picklist is enforced at the API boundary, not the DB.
+  - `paystackProvider.initiateTransfer` now calls Paystack's real `GET /bank` first, resolves the
+    Renter's bank name to its actual code via `resolveBankCode`, and only then calls
+    `POST /transferrecipient` with that real code - never a guessed/placeholder one. A bank name
+    that doesn't resolve against Paystack's real list fails the transfer cleanly (same
+    `admin_review` fallback as any other transfer failure) rather than risking a wrong code.
+  - **Still not yet tested against real credentials** (same caveat pattern as every other
+    Paystack/Prembly/GCS provider) - specifically, `nigerianBanks.js`'s own caveat flags that its
+    20 bank names have never been checked against a real `GET /bank` response, so `resolveBankCode`
+    matching each one correctly is unverified until that happens.
+  - Test coverage: 6 new unit tests for `resolveBankCode` (exact match, a partial/substring match
+    for when Paystack's real name has extra words ours doesn't, no match, and malformed input) and
+    for `NIGERIAN_BANK_NAMES` itself (no empty/duplicate entries).
+- 90 automated backend tests (unit + integration, run against the real database, not mocked) -
   all passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -294,9 +316,8 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
 cron/scheduler wiring for the 9pm-WAT payout evaluation script (see "evaluate-payouts" below),
 Termii/Prembly/Paystack *live* integrations (all providers are written but untested against real
 credentials - see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
-`src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js` -
-Paystack's Transfer (payout) side has an additional unresolved `bank_code` caveat, see below),
-and the mobile app.
+`src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js`), and the
+mobile app.
 
 ## Requirements
 
@@ -372,11 +393,13 @@ Server listens on `PORT` from `.env` (default `4000`). Check `GET /health` once 
   `src/modules/payments/paystackProvider.js` before switching a real environment over to it,
   including the webhook signature verification, which is written per Paystack's documented
   scheme but never exercised against a real webhook payload.
-- The Transfer (payout) side has its own, more serious caveat on top of the above: it passes the
-  Renter's free-text `bank_name` through as Paystack's required numeric `bank_code`, which will
-  not work against the real API until either a `GET /bank` lookup table is added or the real
-  bank code is captured at bank-details-submission time instead of/alongside the bank name - see
-  the comment on `initiateTransfer` in `paystackProvider.js`.
+- The Transfer (payout) side used to have its own, more serious caveat on top of the above (it
+  passed the Renter's free-text `bank_name` through as Paystack's required numeric `bank_code`,
+  which would never have worked) - **fixed 2026-09-26**: `initiateTransfer` now calls Paystack's
+  real `GET /bank` and resolves the Renter's chosen bank name (now a fixed picklist - see
+  `src/modules/payments/nigerianBanks.js`) to its actual code first. Still untested against real
+  credentials, same as everything else on this list - see the comment on `initiateTransfer` in
+  `paystackProvider.js`.
 
 ## Renter Payout: the two-path hold/release system
 
