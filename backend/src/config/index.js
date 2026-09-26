@@ -55,6 +55,14 @@ const config = {
     },
   },
 
+  scheduler: {
+    // Shared secret an external scheduler (GCP Cloud Scheduler, cron, etc.) must send as
+    // X-Scheduler-Secret to trigger POST /internal/evaluate-payouts (see routes/internalRoutes.js
+    // and jobs/evaluateCheckInDayPayouts.js). Empty by default so the endpoint is CLOSED (every
+    // request 401s) until this is explicitly set - never falls open.
+    secret: process.env.SCHEDULER_SECRET || '',
+  },
+
   // Business rules from spec/decisions-and-phasing.md - kept here as defaults/fallbacks only.
   // The authoritative values live in the admin_settings / price_caps DB tables so Admin can
   // change them without a redeploy; these constants are used only for seeding those tables.
