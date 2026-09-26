@@ -160,16 +160,22 @@ td.description {
 input[type='text'],
 input[type='email'],
 input[type='password'],
-input[type='number'] {
+input[type='number'],
+select {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 14px;
   width: 100%;
+  font-family: inherit;
 }
 
 table input[type='number'] {
   max-width: 140px;
+}
+
+table select {
+  max-width: 220px;
 }
 
 button {
@@ -229,6 +235,54 @@ button:disabled {
 .badge-none {
   background: var(--pending-bg);
   color: var(--pending);
+}
+
+/* Payout review-case statuses (admin_review_cases.status) */
+.badge-open {
+  background: var(--pending-bg);
+  color: var(--pending);
+}
+
+.badge-resolved {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+/* bookings.payout_status */
+.badge-held {
+  background: var(--pending-bg);
+  color: var(--pending);
+}
+
+.badge-released {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badge-admin_review {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.badge-not_applicable {
+  background: var(--pending-bg);
+  color: var(--muted);
+}
+
+/* viewing_bookings.status */
+.badge-scheduled {
+  background: var(--pending-bg);
+  color: var(--pending);
+}
+
+.badge-completed {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badge-cancelled {
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .error-banner {

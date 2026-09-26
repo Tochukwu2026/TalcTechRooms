@@ -214,8 +214,28 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     caps + cancellation freeing the date back up + cross-customer cancel rejection, and the full
     Admin-assign/Staff-complete path including a wrong-staff-member rejection and a non-staff
     assignment 404).
-- 81 automated tests (unit + integration, run against the real database, not mocked) - all
-  passing as of this write-up. Run them yourself with `npm test`.
+- **Admin dashboard UI for both backend-only queues, BUILT (2026-09-25)** - the founder's next
+  pick after the Live/Video Viewing backend above: two new pages in `admin-dashboard/`, following
+  the exact conventions of the existing Renter Approvals / Price Caps pages (same `apiFetch`/
+  `useAuth` pattern, `.badge-<status>` styling, row-scoped action buttons).
+  - **Payout Review Cases** (`/review-cases`): lists open/resolved cases from
+    `GET /admin/review-cases?status=`, shows the booking id, check-in date, reason, notes, payout
+    amount and payout status, and resolves a case via `PATCH /admin/review-cases/:id/resolve`
+    with a `window.confirm` + optional notes prompt for either `release_payout` or
+    `refund_customer`.
+  - **Viewing Assignments** (`/viewings`): lists viewings from `GET /admin/viewings`
+    (`unassignedOnly` checkbox, defaults on) and assigns a staff member via a dropdown + Assign
+    button, calling `PATCH /admin/viewings/:id/assign`.
+  - **New backend endpoint added to support the dropdown**: `GET /admin/staff` (Admin-only) lists
+    all `role = 'staff'` users (`id`, `email`, `full_name`) - there was no way to enumerate staff
+    accounts before this; the alternative (a manual staff-user-ID text field) would have made the
+    Admin look up ids by hand, which the dropdown avoids. 1 new integration test covers it.
+  - Both new pages and the new nav links (`Layout.jsx`) are Admin-only, same as the rest of the
+    dashboard - no separate Staff-facing UI was built (Staff still only has the API,
+    `GET /staff/viewings/me` / `POST /staff/viewings/:id/complete`, per the original backend-only
+    scope for this feature).
+- 82 automated backend tests (unit + integration, run against the real database, not mocked) -
+  all passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
 `src/modules/accommodations/accommodationService.js` for the full reasoning):
@@ -234,8 +254,7 @@ Paystack *live* integrations (all providers are written but untested against rea
 see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
 `src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js` -
 Paystack's Transfer (payout) side has an additional unresolved `bank_code` caveat, see below),
-an Admin-dashboard UI page for viewing-staff assignment (the backend endpoints now exist - see
-"Live/Video Viewing" above), and the mobile app.
+and the mobile app.
 
 ## Requirements
 
@@ -352,7 +371,7 @@ src/
     payments/       provider-agnostic interface + mock/paystack providers (charges + transfers)
     renters/        renter registration + lookup + bank-details update
     customers/      customer registration
-    admin/          renter approval queue, price-cap + settings management
+    admin/          renter approval queue, staff directory, price-cap + settings management
     accommodations/ listing CRUD, price-cap lookup, amenities/images/viewing-availability
     checkout/       Rent/Admin-Costs/VAT/commission math + admin_settings lookup
     booking/        availability math + real booking creation (Paystack charge -> bookings row)

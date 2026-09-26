@@ -385,6 +385,15 @@ test('Admin can list viewings and assign a staff member; staff can see and compl
   assert.equal(complete.body.status, 'completed');
 });
 
+test('Admin can list staff accounts (for the assign-staff dropdown)', async () => {
+  const adminToken = await makeAdmin();
+  const { userId: staffUserId } = await makeStaff('directory-staff@example.com');
+
+  const list = await request(app).get('/admin/staff').set('Authorization', `Bearer ${adminToken}`);
+  assert.equal(list.status, 200);
+  assert.ok(list.body.some((s) => String(s.id) === String(staffUserId)));
+});
+
 test('A staff member cannot mark another staff member\'s assigned viewing complete', async () => {
   const { token: renterToken } = await makeApprovedRenter();
   const listingId = await createListing(renterToken);

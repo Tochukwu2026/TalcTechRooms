@@ -18,6 +18,12 @@ export default function Layout() {
           <NavLink to="/price-caps" className={({ isActive }) => (isActive ? 'active' : '')}>
             Price Caps
           </NavLink>
+          <NavLink to="/review-cases" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Payout Review Cases
+          </NavLink>
+          <NavLink to="/viewings" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Viewing Assignments
+          </NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Business Settings
           </NavLink>

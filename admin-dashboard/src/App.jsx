@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import RenterApprovalsPage from './pages/RenterApprovalsPage.jsx';
 import PriceCapsPage from './pages/PriceCapsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import ReviewCasesPage from './pages/ReviewCasesPage.jsx';
+import ViewingsPage from './pages/ViewingsPage.jsx';
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
           <Route index element={<Navigate to="/renters" replace />} />
           <Route path="/renters" element={<RenterApprovalsPage />} />
           <Route path="/price-caps" element={<PriceCapsPage />} />
+          <Route path="/review-cases" element={<ReviewCasesPage />} />
+          <Route path="/viewings" element={<ViewingsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>

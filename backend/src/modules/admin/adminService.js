@@ -66,6 +66,15 @@ async function rejectRenter({ renterUserId, adminUserId, reason }) {
   return rows[0];
 }
 
+// --- Staff directory (for the Admin's "assign staff" viewing dropdown - see viewingService) ---
+
+async function listStaff() {
+  const { rows } = await pool.query(
+    `SELECT id, email, full_name FROM users WHERE role = 'staff' ORDER BY full_name ASC`
+  );
+  return rows;
+}
+
 // --- Price Cap management (spec/decisions-and-phasing.md > Admin Portal) ---
 
 async function listPriceCaps() {
@@ -133,6 +142,7 @@ module.exports = {
   listPendingRenters,
   approveRenter,
   rejectRenter,
+  listStaff,
   listPriceCaps,
   updatePriceCap,
   createPriceCap,

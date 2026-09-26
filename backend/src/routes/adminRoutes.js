@@ -6,6 +6,7 @@ const {
   listPendingRenters,
   approveRenter,
   rejectRenter,
+  listStaff,
   listPriceCaps,
   updatePriceCap,
   createPriceCap,
@@ -128,6 +129,13 @@ router.patch(
 
 // --- Live/Video Viewing staff assignment queue ---
 // See spec/decisions-and-phasing.md > Platform & Stack > Admin Portal / Staff access.
+
+router.get(
+  '/staff',
+  asyncHandler(async (req, res) => {
+    res.json(await listStaff());
+  })
+);
 
 router.get(
   '/viewings',
