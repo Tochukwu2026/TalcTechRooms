@@ -59,3 +59,22 @@ test('mock provider: a bank account number ending in 0 deterministically simulat
   });
   assert.equal(result.status, 'failed');
 });
+
+test('mock provider: refunding a reference that actually succeeded via initializeCharge succeeds', async () => {
+  await mockProvider.initializeCharge({
+    amountKobo: 2161384,
+    email: 'jane@example.com',
+    reference: 'test_ref_refund_success_1',
+    metadata: { foo: 'bar' },
+  });
+
+  const result = await mockProvider.initiateRefund({ amountKobo: 2161384, reference: 'test_ref_refund_success_1' });
+  assert.equal(result.status, 'success');
+  assert.equal(result.refundReference, 'refund_test_ref_refund_success_1');
+});
+
+test('mock provider: refunding an unknown/never-succeeded reference fails rather than throwing', async () => {
+  const result = await mockProvider.initiateRefund({ amountKobo: 2161384, reference: 'never_initialized_ref' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.refundReference, null);
+});

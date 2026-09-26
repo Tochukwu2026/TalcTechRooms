@@ -234,7 +234,50 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     dashboard - no separate Staff-facing UI was built (Staff still only has the API,
     `GET /staff/viewings/me` / `POST /staff/viewings/:id/complete`, per the original backend-only
     scope for this feature).
-- 82 automated backend tests (unit + integration, run against the real database, not mocked) -
+- **Automatic refund on an availability conflict, BUILT (2026-09-26)** - the piece
+  `bookingService.finalizeBooking` deliberately stopped short of when booking creation was first
+  built (see the "Deliberate scope cut" note above), now built. Fixes the race where two
+  Customers both pass the availability check at `initialize` time but only one unit remains, so
+  whichever of them finalizes second has already been charged for a unit that's now gone.
+  - `finalizeBooking` now calls a new `payments.initiateRefund({ amountKobo, reference, reason })`
+    against the ORIGINAL charge's own reference (Paystack's real Refund API needs only that - no
+    bank/recipient details, since Paystack returns the money to the original payment method
+    itself, unlike a Renter payout Transfer). `paystackProvider.js`'s implementation is written
+    from Paystack's docs but **not yet tested against real credentials** (same caveat pattern as
+    the other providers) and has its own caveat about Paystack's refund possibly being
+    asynchronous (`pending` vs `processed`) - see the comment at the top of that function.
+  - **Refund amount - the founder's explicit choice (2026-09-26)**: the **full** amount charged
+    (Rent + Admin Costs + VAT), not the Rent-only scope that applies to an actual cancellation or
+    fraud case (see Refund scope in `spec/decisions-and-phasing.md`) - since no booking is ever
+    created here and nothing was delivered at all, there's no basis for TalcTech to keep any part
+    of the charge.
+  - **Schema change**: migration `0010_refund_availability_conflict` makes `refunds.booking_id`
+    nullable and adds `refunds.paystack_charge_reference` - an availability-conflict refund has no
+    `bookings` row to attach to (a booking only ever represents a real, successfully reserved
+    stay), so it's recorded with `booking_id = NULL` and the original charge's reference instead.
+    Also adds `'availability_conflict'` to the `refund_reason` enum, alongside the existing
+    `'customer_cancellation'`/`'fraud_confirmed'`.
+  - `finalizeBooking`'s conflict return value is now `'availability_conflict_refunded'` (refund
+    succeeded - the normal case) or `'availability_conflict_refund_failed'` (the refund call
+    itself failed, e.g. a real Paystack outage - rare enough, and with no booking to attach an
+    Admin review case to, that surfacing it in the response for the Customer to contact support is
+    the right fallback rather than a dedicated review queue). Both are still HTTP 409 from
+    `POST /bookings/verify/:reference`, now with a message telling the Customer what actually
+    happened instead of asking them to contact support for a refund that isn't automatic.
+  - **Real test-authoring bug found and fixed while adding coverage for this**: an existing Live
+    Viewing monthly-cap test computed its 4 test dates as `today + {2,3,4,5} days`, which
+    intermittently rolled into the following calendar month whenever "today" was late enough in
+    the month (it broke on 2026-09-26, since Sep 26 + 5 days = Oct 1) - the monthly cap is
+    deliberately calendar-month-scoped, so a date in the next month was never going to be capped
+    by the current month's count. Fixed with a `sameMonthFutureDates()` helper anchored to the
+    1st of next month instead of an offset from "today".
+  - Test coverage: 2 new unit tests (the mock refund provider's deterministic success/failure,
+    keyed off whether a charge actually succeeded via `initializeCharge` - there's no user-
+    supplied input to fail on the way there is for ID documents/bank accounts) + 1 new integration
+    test (two Customers racing for the last unit - the first finalizes and gets a real booking,
+    the second gets `availability_conflict_refunded` and a `refunds` row for the full amount with
+    `booking_id = NULL`).
+- 85 automated backend tests (unit + integration, run against the real database, not mocked) -
   all passing as of this write-up. Run them yourself with `npm test`.
 
 **Known simplifications in the Accommodation CRUD** (see comments at the relevant lines in
@@ -247,11 +290,10 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
   exists yet to be holding units against active bookings - revisit once bookings exist, so an
   in-progress booking's held units aren't silently overwritten by an edit.
 
-**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): an
-automatic refund on an availability conflict at booking-finalize time, real cron/scheduler
-wiring for the 9pm-WAT payout evaluation script (see "evaluate-payouts" below), Termii/Prembly/
-Paystack *live* integrations (all providers are written but untested against real credentials -
-see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
+**Not yet built** (see `spec/decisions-and-phasing.md` > Build Phasing for the full list): real
+cron/scheduler wiring for the 9pm-WAT payout evaluation script (see "evaluate-payouts" below),
+Termii/Prembly/Paystack *live* integrations (all providers are written but untested against real
+credentials - see the caveats at the top of `src/modules/idVerification/premblyProvider.js`,
 `src/modules/storage/gcsProvider.js`, and `src/modules/payments/paystackProvider.js` -
 Paystack's Transfer (payout) side has an additional unresolved `bank_code` caveat, see below),
 and the mobile app.
@@ -368,7 +410,7 @@ src/
     auth/           password hashing, JWT sign/verify, login service
     idVerification/ provider-agnostic interface + mock/prembly providers
     storage/        provider-agnostic interface + mock/gcs providers (accommodation images)
-    payments/       provider-agnostic interface + mock/paystack providers (charges + transfers)
+    payments/       provider-agnostic interface + mock/paystack providers (charges, transfers, refunds)
     renters/        renter registration + lookup + bank-details update
     customers/      customer registration
     admin/          renter approval queue, staff directory, price-cap + settings management

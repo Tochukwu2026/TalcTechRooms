@@ -200,4 +200,60 @@ async function initiateTransfer({ amountKobo, accountNumber, bankName, accountNa
   };
 }
 
-module.exports = { initializeCharge, verifyCharge, verifyWebhookSignature, initiateTransfer };
+/**
+ * Refunds a previously-successful charge via Paystack's Refund API (POST /refund, keyed by the
+ * original transaction reference - no bank/recipient details needed, unlike initiateTransfer,
+ * since Paystack returns the money to the original payment method itself).
+ *
+ * IMPORTANT / NOT YET VERIFIED, same caveat as the other functions in this file - written from
+ * Paystack's published Refunds docs, never called with real credentials. One thing specifically
+ * worth confirming before relying on this in production: Paystack's refund is asynchronous for
+ * some payment channels (their docs describe a `processed`/`pending` distinction) - this treats
+ * only an immediate 'processed' response as success and anything else (including 'pending') as a
+ * failure so it's surfaced rather than silently assumed to have gone through; if pending refunds
+ * turn out to be the common case in practice, this will need a webhook-driven confirmation step
+ * instead (Paystack does send a `refund.processed` webhook event).
+ */
+async function initiateRefund({ amountKobo, reference, reason }) {
+  const { secretKey, baseUrl } = config.payments.paystack;
+  if (!secretKey) {
+    throw new Error(
+      'PAYSTACK_SECRET_KEY is not set. Set PAYSTACK_MODE=mock in .env until real Paystack ' +
+        'credentials are available.'
+    );
+  }
+
+  const response = await fetch(`${baseUrl}/refund`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ transaction: reference, amount: amountKobo, merchant_note: reason }),
+  });
+  const body = await response.json();
+
+  if (!response.ok || !body.status) {
+    return {
+      provider: 'paystack',
+      status: 'failed',
+      refundReference: null,
+      raw: body,
+    };
+  }
+
+  return {
+    provider: 'paystack',
+    status: body.data.status === 'processed' ? 'success' : 'failed',
+    refundReference: String(body.data.id ?? reference),
+    raw: body.data,
+  };
+}
+
+module.exports = {
+  initializeCharge,
+  verifyCharge,
+  verifyWebhookSignature,
+  initiateTransfer,
+  initiateRefund,
+};

@@ -93,6 +93,23 @@ function tomorrowIso() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+// Returns `count` distinct future dates guaranteed to fall in the SAME calendar month as each
+// other - anchored to the 1st of next month rather than "today + i days", so the test doesn't
+// intermittently break when "today" is late enough in the current month that a few days' offset
+// rolls into the following month (e.g. today=Sep 26, +5 days = Oct 1 - a real bug this test hit
+// on 2026-09-26, since the monthly-cap check is deliberately calendar-month-scoped, not rolling).
+function sameMonthFutureDates(count) {
+  const now = new Date();
+  const firstOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const dates = [];
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(firstOfNextMonth);
+    d.setUTCDate(d.getUTCDate() + i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
 test('Executive Customer can book a Video Viewing within the 30-day window', async () => {
   const { token: renterToken } = await makeApprovedRenter();
   const listingId = await createListing(renterToken);
@@ -269,16 +286,14 @@ test('Live Viewing: at most 3 total per month across all listings for the same E
   const { token: execToken } = await registerCustomer();
 
   const listingIds = [];
-  const dates = [];
+  const dates = sameMonthFutureDates(4);
   for (let i = 0; i < 4; i += 1) {
     const listingId = await createListing(renterToken);
     listingIds.push(listingId);
-    const date = new Date(Date.now() + (2 + i) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    dates.push(date);
     await request(app)
       .post(`/accommodations/${listingId}/viewing-availability`)
       .set('Authorization', `Bearer ${renterToken}`)
-      .send({ dates: [date] });
+      .send({ dates: [dates[i]] });
   }
 
   for (let i = 0; i < 3; i += 1) {

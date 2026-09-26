@@ -86,4 +86,27 @@ async function initiateTransfer({ amountKobo, accountNumber, bankName, accountNa
   };
 }
 
-module.exports = { initializeCharge, verifyCharge, initiateTransfer };
+// Refunds a previously-verified charge by its own reference. Unlike the ID-verification/
+// bank-account mocks above, there's no user-supplied input to key a deterministic
+// success/failure convention off of here - a refund's own "does this charge exist" check is
+// itself the natural thing to fail on, so that's what this does: succeeds for any reference this
+// mock actually saw succeed via initializeCharge, fails otherwise.
+async function initiateRefund({ amountKobo, reference }) {
+  const charge = charges.get(reference);
+  if (!charge || charge.status !== 'success') {
+    return {
+      provider: 'mock',
+      status: 'failed',
+      refundReference: null,
+      raw: { note: 'mock provider - no successful charge found for this reference' },
+    };
+  }
+  return {
+    provider: 'mock',
+    status: 'success',
+    refundReference: `refund_${reference}`,
+    raw: { note: 'mock provider - no real API call made', amountKobo, reference },
+  };
+}
+
+module.exports = { initializeCharge, verifyCharge, initiateTransfer, initiateRefund };

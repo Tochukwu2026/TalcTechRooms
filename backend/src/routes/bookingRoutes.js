@@ -25,12 +25,20 @@ router.post(
     if (result.status === 'payment_failed') {
       return res.status(402).json({ status: 'payment_failed' });
     }
-    if (result.status === 'availability_conflict') {
+    if (result.status === 'availability_conflict_refunded') {
       return res.status(409).json({
-        status: 'availability_conflict',
+        status: 'availability_conflict_refunded',
         message:
-          'Payment succeeded but these units are no longer available. Contact support for a refund - ' +
-          'automatic refunds for this case are not built yet.',
+          'Payment succeeded but these units became unavailable before your booking could be ' +
+          'confirmed, so you have been automatically refunded in full.',
+      });
+    }
+    if (result.status === 'availability_conflict_refund_failed') {
+      return res.status(409).json({
+        status: 'availability_conflict_refund_failed',
+        message:
+          'Payment succeeded but these units are no longer available, and the automatic refund ' +
+          'could not be processed. Please contact support for a manual refund.',
       });
     }
 

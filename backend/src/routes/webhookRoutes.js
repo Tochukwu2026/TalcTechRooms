@@ -31,8 +31,9 @@ router.post(
     }
 
     // Paystack expects a fast 200 regardless of what finalizeBooking decided (payment_failed/
-    // availability_conflict aren't errors from Paystack's point of view - the charge itself
-    // still succeeded) - respond promptly so Paystack doesn't retry.
+    // an availability conflict aren't errors from Paystack's point of view - the charge itself
+    // still succeeded, and a conflict is now refunded automatically) - respond promptly so
+    // Paystack doesn't retry.
     res.status(200).json({ received: true });
   })
 );

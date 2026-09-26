@@ -51,6 +51,19 @@ async function initiateTransfer({ amountKobo, accountNumber, bankName, accountNa
 }
 
 /**
+ * Refunds a previously-successful charge, by its own reference - used when a charge succeeds but
+ * a booking can never be created for it (the availability-conflict case in
+ * src/modules/booking/bookingService.js), independent of the two-path Renter payout module's own
+ * booking-scoped refunds (Path B/Admin resolution in src/modules/payout, which insert into
+ * `refunds` directly since those always have a real booking to attach to).
+ * @param {{amountKobo:number, reference:string, reason:string}} params
+ * @returns {Promise<{provider:string, status:'success'|'failed', refundReference:string|null, raw:object}>}
+ */
+async function initiateRefund({ amountKobo, reference, reason }) {
+  return provider().initiateRefund({ amountKobo, reference, reason });
+}
+
+/**
  * Webhook signature check - only meaningful in real ('paystack') mode, since mock mode has no
  * real webhook secret and nothing will ever call the webhook route with a genuine signature in
  * dev/test. In mock mode this always passes, so the webhook route can still be exercised in
@@ -67,4 +80,5 @@ module.exports = {
   generateReference,
   verifyWebhookSignature,
   initiateTransfer,
+  initiateRefund,
 };

@@ -18,9 +18,16 @@
 //
 // Renter payout (the two-path 9pm-WAT hold/release logic) is NOT built yet - every booking
 // created here just sits at payout_status='held' (Path A's starting state) until that's built.
-// Refunding a Customer when availability changes between initialize and finalize (see the
-// conflict case below) is also not built yet, for the same reason - flagged in the return
-// value so the caller can tell the Customer to contact support for now.
+//
+// Availability-conflict refund (BUILT 2026-09-26): if the units are gone by finalize time (a
+// race between two Customers' initialize calls - see the conflict case below), the Customer's
+// charge is refunded automatically via payments.initiateRefund, for the FULL amount charged
+// (Rent + Admin Costs + VAT, not the Rent-only scope that applies to an actual cancellation or
+// fraud case - the founder's explicit choice, 2026-09-26, since no booking is ever created here
+// and nothing was delivered at all). No `bookings` row exists to attach this refund to (a
+// booking only represents a real, successfully reserved stay), so it's recorded in `refunds`
+// with a NULL `booking_id` and the original charge's reference instead - see migration
+// 0010_refund_availability_conflict.
 
 const { pool } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
@@ -123,7 +130,7 @@ function toBookingResponse(row) {
  * Finalizes a previously-initialized charge: verifies it with Paystack, and if (and only if)
  * it succeeded, creates the booking. Idempotent - safe to call twice for the same reference
  * (e.g. both the webhook and a Customer's manual verify call land for the same payment).
- * @returns {Promise<{status:'created'|'already_finalized'|'payment_failed'|'not_found'|'availability_conflict', booking?:object}>}
+ * @returns {Promise<{status:'created'|'already_finalized'|'payment_failed'|'not_found'|'availability_conflict_refunded'|'availability_conflict_refund_failed', booking?:object}>}
  */
 async function finalizeBooking(reference) {
   const existing = await findBookingByReference(reference);
@@ -158,11 +165,38 @@ async function finalizeBooking(reference) {
     meta.checkOut
   );
   if (meta.units > stillAvailable) {
-    // The Customer has already been charged but the units are gone - refunding this
-    // automatically needs the Paystack refund/transfer plumbing, which isn't built yet (see
-    // module header). Surface this clearly rather than silently creating an invalid booking or
-    // silently dropping the Customer's money.
-    return { status: 'availability_conflict', reference, totalChargedNaira: meta.totalChargedNaira };
+    // The Customer has already been charged but the units are gone - refund the full charge
+    // automatically (see module header) rather than creating an invalid booking or silently
+    // dropping the Customer's money.
+    const refundResult = await payments.initiateRefund({
+      amountKobo: toKobo(meta.totalChargedNaira),
+      reference,
+      reason: `TalcTech Rooms availability-conflict refund - charge ${reference} could not be honored`,
+    });
+
+    if (refundResult.status !== 'success') {
+      // Couldn't even get the refund itself to go through (e.g. a real Paystack outage) - this
+      // is rare enough, and there's no booking to attach an Admin review case to, that surfacing
+      // it clearly to the caller (who can tell the Customer to contact support) is the right
+      // fallback rather than silently losing track of it.
+      return {
+        status: 'availability_conflict_refund_failed',
+        reference,
+        totalChargedNaira: meta.totalChargedNaira,
+      };
+    }
+
+    await pool.query(
+      `INSERT INTO refunds (booking_id, amount_naira, reason, paystack_refund_reference, paystack_charge_reference)
+       VALUES (NULL, $1, 'availability_conflict', $2, $3)`,
+      [meta.totalChargedNaira, refundResult.refundReference, reference]
+    );
+
+    return {
+      status: 'availability_conflict_refunded',
+      reference,
+      totalChargedNaira: meta.totalChargedNaira,
+    };
   }
 
   const renterNetPayoutNaira = meta.renterGrossPayoutNaira; // no Paystack transfer fee logic yet (payout module not built) - see decisions log Renter Payout > Fee handling.

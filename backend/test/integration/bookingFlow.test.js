@@ -215,6 +215,54 @@ test('A second Customer cannot book more units than remain once the first Custom
   assert.equal(init2.status, 409);
 });
 
+test('An availability conflict at finalize time auto-refunds the Customer in full and creates no booking', async () => {
+  const { token: renterToken } = await makeApprovedRenter();
+  const listingId = await createListing(renterToken, { numberOfUnits: 1, nightlyRentNaira: 20000 });
+  const { token: customer1Token } = await registerCustomer('first@example.com');
+  const { token: customer2Token } = await registerCustomer('second@example.com');
+
+  // Both Customers initialize while the single unit is still (correctly) reported available -
+  // the race only becomes a real conflict once one of them actually finalizes first.
+  const init1 = await request(app)
+    .post(`/accommodations/${listingId}/bookings/initialize`)
+    .set('Authorization', `Bearer ${customer1Token}`)
+    .send({ checkIn: '2026-10-05', checkOut: '2026-10-06', units: 1 });
+  const init2 = await request(app)
+    .post(`/accommodations/${listingId}/bookings/initialize`)
+    .set('Authorization', `Bearer ${customer2Token}`)
+    .send({ checkIn: '2026-10-05', checkOut: '2026-10-06', units: 1 });
+  assert.equal(init1.status, 201);
+  assert.equal(init2.status, 201);
+
+  const verify1 = await request(app)
+    .post(`/bookings/verify/${init1.body.reference}`)
+    .set('Authorization', `Bearer ${customer1Token}`)
+    .send();
+  assert.equal(verify1.status, 201, JSON.stringify(verify1.body));
+
+  const verify2 = await request(app)
+    .post(`/bookings/verify/${init2.body.reference}`)
+    .set('Authorization', `Bearer ${customer2Token}`)
+    .send();
+  assert.equal(verify2.status, 409, JSON.stringify(verify2.body));
+  assert.equal(verify2.body.status, 'availability_conflict_refunded');
+
+  // Only customer1's booking exists.
+  const { rows: bookingRows } = await pool.query('SELECT count(*)::int AS n FROM bookings');
+  assert.equal(bookingRows[0].n, 1);
+
+  // A refund row was recorded for the full amount, with no booking to attach to.
+  const { rows: refundRows } = await pool.query(
+    `SELECT booking_id, amount_naira, reason, paystack_charge_reference, paystack_refund_reference FROM refunds`
+  );
+  assert.equal(refundRows.length, 1);
+  assert.equal(refundRows[0].booking_id, null);
+  assert.equal(Number(refundRows[0].amount_naira), 21613.84); // full totalChargedNaira, not just Rent
+  assert.equal(refundRows[0].reason, 'availability_conflict');
+  assert.equal(refundRows[0].paystack_charge_reference, init2.body.reference);
+  assert.ok(refundRows[0].paystack_refund_reference);
+});
+
 test('A Customer can fetch their own booking but not another Customer\'s', async () => {
   const { token: renterToken } = await makeApprovedRenter();
   const listingId = await createListing(renterToken);
