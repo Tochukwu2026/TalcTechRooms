@@ -13,9 +13,21 @@ const config = require('../config');
 // checkoutService.resolveBookingQuote and availabilityService.getUnitsAvailable.
 types.setTypeParser(1082, (value) => value);
 
-const pool = new Pool({
-  connectionString: config.db.connectionString,
-});
+// Two ways to configure the connection, matching how Google's own Node.js Cloud SQL samples do
+// it (see DEPLOY.md): a plain DATABASE_URL connection string for local dev/testing (the default),
+// or - when INSTANCE_UNIX_SOCKET is set (Cloud Run + Cloud SQL) - an explicit `host` field
+// pointing at the Unix socket Cloud Run mounts automatically, which is the documented-safe way to
+// pass a socket path to `pg` rather than trying to encode it into a connection-string URL.
+const poolConfig = config.db.socketPath
+  ? {
+      host: config.db.socketPath,
+      user: config.db.socketUser,
+      password: config.db.socketPassword,
+      database: config.db.socketDatabase,
+    }
+  : { connectionString: config.db.connectionString };
+
+const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   // A background/idle client error should not crash the whole process.

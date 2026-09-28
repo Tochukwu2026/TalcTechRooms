@@ -11,6 +11,17 @@ const config = {
 
   db: {
     connectionString: required('DATABASE_URL', 'postgres://postgres:postgres@localhost:5432/talctech_rooms'),
+    // Cloud Run + Cloud SQL connect over a Unix socket Cloud Run mounts automatically
+    // (`/cloudsql/<INSTANCE_CONNECTION_NAME>`), not a normal host:port - `pg` needs this passed
+    // as an explicit `host` field on its own, not folded into a connection-string URL (there's
+    // real doubt over whether pg's URL parser reliably treats a `?host=/cloudsql/...` query
+    // param as a socket path the way some blog posts claim - untested and not worth risking in
+    // production). Set INSTANCE_UNIX_SOCKET (+ DB_USER/DB_PASSWORD/DB_NAME) instead of DATABASE_URL
+    // when deploying to Cloud Run - see db/pool.js and DEPLOY.md.
+    socketPath: process.env.INSTANCE_UNIX_SOCKET || '',
+    socketUser: process.env.DB_USER || '',
+    socketPassword: process.env.DB_PASSWORD || '',
+    socketDatabase: process.env.DB_NAME || '',
   },
 
   jwt: {

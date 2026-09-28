@@ -260,8 +260,11 @@ test('Live Viewing: at most 1 per listing per month for the same Executive Custo
   const listingId = await createListing(renterToken);
   const { token: execToken } = await registerCustomer();
 
-  const day1 = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const day2 = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Both dates must fall in the same calendar month (the cap is per-calendar-month, not a
+  // rolling window) - a fixed "+2/+3 days" offset broke on 2026-09-28 for the same reason
+  // documented on sameMonthFutureDates() below (a short trip to the next month), so this uses
+  // that same helper instead of hardcoded day offsets.
+  const [day1, day2] = sameMonthFutureDates(2);
   await request(app)
     .post(`/accommodations/${listingId}/viewing-availability`)
     .set('Authorization', `Bearer ${renterToken}`)

@@ -2,7 +2,9 @@
 
 Node.js + Express + PostgreSQL backend for the TalcTech Rooms overnight-rentals marketplace.
 See `../spec/requirements-v1.md` and `../spec/decisions-and-phasing.md` for the full product
-spec and confirmed business decisions this code implements.
+spec and confirmed business decisions this code implements. **See `DEPLOY.md` for deploying this
+to Google Cloud Run + Cloud SQL** - needed so the mobile app (in progress) has a real, always-on
+API URL to talk to instead of a laptop/sandbox address.
 
 ## Status (2026-09-25)
 
@@ -369,6 +371,41 @@ Built and verified against a real local PostgreSQL instance (not just syntax-che
     tests (a real booking confirmation logs a sent SMS + sent email; a phone ending in `0` logs a
     failed SMS without blocking the booking itself; a Video Viewing confirmation logs a sent SMS +
     sent email).
+- **Google Cloud Run deployment support, ADDED (2026-09-28)** - needed to give the mobile app (in
+  progress) a real, always-on API URL to hit from a phone, instead of only this sandbox or a
+  developer's own laptop. See `DEPLOY.md` for the full step-by-step runbook (you run it yourself
+  against your own GCP account - I don't have your GCP credentials, same as Paystack/Termii).
+  - New `Dockerfile` + `.dockerignore` - a plain Node 20 image; no code changes were needed to
+    make the app itself Cloud-Run-ready (`config.port` already reads `process.env.PORT`, which
+    Cloud Run sets automatically).
+  - **Cloud SQL connectivity**: Cloud Run reaches Cloud SQL over a Unix socket it mounts
+    automatically, not a normal host:port - `src/db/pool.js` now supports this as a second,
+    explicit connection mode (`INSTANCE_UNIX_SOCKET` + `DB_USER`/`DB_PASSWORD`/`DB_NAME` env vars,
+    building a plain `{ host, user, password, database }` Pool config), alongside the existing
+    `DATABASE_URL` connection-string mode used for local dev - deliberately NOT folding the socket
+    path into a `DATABASE_URL` query-string trick some blog posts suggest, since there was no
+    solid confirmation that `pg`'s connection-string parser reliably treats `?host=/cloudsql/...`
+    as a socket path; the explicit-fields approach matches Google's own documented Node.js sample
+    exactly, so there's nothing to verify once actually deployed.
+  - Local dev/tests are unaffected either way - `INSTANCE_UNIX_SOCKET` is unset in that
+    environment, so `pool.js` falls back to the existing `DATABASE_URL` path exactly as before.
+  - **I could not actually build/run the Docker image myself to verify it** - this sandbox's own
+    network policy blocks Docker Hub (where the `node:20-slim` base image lives), so `docker
+    build` fails here with a 403. This isn't a real-world limitation - `gcloud run deploy --source
+    .` builds via Cloud Build, which has full internet access - but it does mean the Dockerfile
+    itself hasn't been test-built anywhere yet. Worth watching the first real deploy's build logs.
+  - **Everything ships in `mock` mode by default** in the example deploy command in `DEPLOY.md` -
+    this gets a real, reachable backend live without requiring real Paystack/Prembly/Termii/GCS
+    credentials yet; each provider can be flipped to live independently, whenever real credentials
+    exist for it.
+  - **Test coverage**: no new automated tests (this is deployment configuration, not application
+    logic) - the fixed date-rolling test bug below was caught incidentally while re-running the
+    full suite to confirm the `pool.js` change didn't affect local/test behavior.
+  - **Incidental fix**: `viewingFlow.test.js`'s "Live Viewing: at most 1 per listing per month"
+    test used a hardcoded "+2/+3 days" date offset, which broke on 2026-09-28 for the same
+    calendar-month-rollover reason documented on the existing `sameMonthFutureDates()` helper (a
+    short trip across a month boundary) - now uses that helper instead, same fix pattern as the
+    2026-09-26 date-rolling bug in the same file.
 - 100 automated backend tests (unit + integration, run against the real database, not mocked) -
   all passing as of this write-up. Run them yourself with `npm test`.
 
