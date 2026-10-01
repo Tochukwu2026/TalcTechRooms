@@ -28,7 +28,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TalcTech Rooms needs access to your photos so you can add pictures of your accommodation.",
+          "cameraPermission": "TalcTech Rooms needs access to your camera so you can photograph your accommodation."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

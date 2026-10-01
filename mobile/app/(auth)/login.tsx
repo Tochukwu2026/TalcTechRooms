@@ -13,6 +13,7 @@ import { Link, router } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
 import { ApiError } from '@/api/client';
 import { colors } from '@/theme/colors';
+import type { AuthUser } from '@/api/types';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -29,8 +30,8 @@ export default function LoginScreen() {
     }
     setIsSubmitting(true);
     try {
-      await signIn(email.trim(), password);
-      router.replace('/(customer)/home');
+      const user: AuthUser = await signIn(email.trim(), password);
+      router.replace(user.role === 'renter' ? '/(renter)/dashboard' : '/(customer)/home');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
     } finally {

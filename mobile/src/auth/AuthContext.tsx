@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { login as apiLogin, registerCustomer as apiRegisterCustomer, RegisterCustomerInput } from '@/api/auth';
+import { registerRenter as apiRegisterRenter, RegisterRenterInput } from '@/api/renters';
 import { setStoredToken, getStoredToken } from '@/api/client';
 import type { AuthUser } from '@/api/types';
 
@@ -10,11 +11,18 @@ interface AuthContextValue {
   user: AuthUser | null;
   // true until the initial SecureStore check (on app launch) completes.
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  // Returns the signed-in user so a caller (e.g. the login screen) can route by role without
+  // waiting on a state update to propagate.
+  signIn: (email: string, password: string) => Promise<AuthUser>;
   // Registers the Customer, then signs them in immediately (register itself returns no
   // token - see backend customerService.registerCustomer) so there's one smooth flow instead
   // of asking them to log in again right after signing up.
   registerAndSignIn: (input: RegisterCustomerInput) => Promise<{ idVerificationPassed: boolean }>;
+  // Same pattern as registerAndSignIn: registerRenter (backend renterService.registerRenter)
+  // returns no token either, and succeeds regardless of whether ID verification or Admin
+  // approval has happened yet - both of those are checked later (verification already ran;
+  // approval is a separate manual Admin step - see renterRoutes.js/adminService), not here.
+  registerRenterAndSignIn: (input: RegisterRenterInput) => Promise<{ idVerificationPassed: boolean }>;
   signOut: () => Promise<void>;
 }
 
@@ -47,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       const result = await apiLogin(email, password);
       await persistSession(result.token, result.user);
+      return result.user;
     },
     [persistSession]
   );
@@ -65,6 +74,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistSession]
   );
 
+  const registerRenterAndSignIn = useCallback(
+    async (input: RegisterRenterInput) => {
+      const result = await apiRegisterRenter(input);
+      const idVerificationPassed = result.idVerification.status === 'verified';
+      const loginResult = await apiLogin(input.email, input.password);
+      await persistSession(loginResult.token, loginResult.user);
+      return { idVerificationPassed };
+    },
+    [persistSession]
+  );
+
   const signOut = useCallback(async () => {
     await setStoredToken(null);
     await SecureStore.deleteItemAsync(USER_KEY);
@@ -72,8 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, signIn, registerAndSignIn, signOut }),
-    [user, isLoading, signIn, registerAndSignIn, signOut]
+    () => ({ user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut }),
+    [user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

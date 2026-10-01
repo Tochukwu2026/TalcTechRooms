@@ -21,12 +21,20 @@ const DOCUMENT_TYPES: { value: 'nin' | 'passport' | 'pvc'; label: string }[] = [
   { value: 'pvc', label: "Voter's Card" },
 ];
 
+// Two very different accounts share this one screen (per the spec, both sign up with name +
+// ID document) - a role toggle up top swaps which extra fields show and which endpoint/context
+// method gets called, rather than building two near-duplicate screens.
+type AccountKind = 'customer' | 'renter';
+
 export default function RegisterScreen() {
-  const { registerAndSignIn } = useAuth();
+  const { registerAndSignIn, registerRenterAndSignIn } = useAuth();
+  const [accountKind, setAccountKind] = useState<AccountKind>('customer');
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [address, setAddress] = useState(''); // Renter only
   const [documentType, setDocumentType] = useState<'nin' | 'passport' | 'pvc'>('nin');
   const [documentNumber, setDocumentNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,25 +53,47 @@ export default function RegisterScreen() {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (accountKind === 'renter' && !address.trim()) {
+      setError('Please enter your address.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const { idVerificationPassed } = await registerAndSignIn({
-        email: email.trim(),
-        phone: phone.trim() || undefined,
-        fullName: fullName.trim(),
-        password,
-        documentType,
-        documentNumber: documentNumber.trim(),
-      });
-
-      if (!idVerificationPassed) {
-        setNotice(
-          'Account created, but ID verification did not pass - you can browse, but booking ' +
-            'may be restricted until this is resolved.'
-        );
+      if (accountKind === 'renter') {
+        const { idVerificationPassed } = await registerRenterAndSignIn({
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          fullName: fullName.trim(),
+          password,
+          address: address.trim(),
+          documentType,
+          documentNumber: documentNumber.trim(),
+        });
+        if (!idVerificationPassed) {
+          setNotice(
+            'Account created, but ID verification did not pass - an Admin will review this ' +
+              'before you can post an Accommodation.'
+          );
+        }
+        router.replace('/(renter)/dashboard');
+      } else {
+        const { idVerificationPassed } = await registerAndSignIn({
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          fullName: fullName.trim(),
+          password,
+          documentType,
+          documentNumber: documentNumber.trim(),
+        });
+        if (!idVerificationPassed) {
+          setNotice(
+            'Account created, but ID verification did not pass - you can browse, but booking ' +
+              'may be restricted until this is resolved.'
+          );
+        }
+        router.replace('/(customer)/home');
       }
-      router.replace('/(customer)/home');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
     } finally {
@@ -78,7 +108,28 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>Join TalcTech Rooms to book a stay</Text>
+        <Text style={styles.subtitle}>
+          {accountKind === 'customer' ? 'Join TalcTech Rooms to book a stay' : 'List your property on TalcTech Rooms'}
+        </Text>
+
+        <View style={styles.segmentRow}>
+          <Pressable
+            style={[styles.segment, accountKind === 'customer' && styles.segmentActive]}
+            onPress={() => setAccountKind('customer')}
+          >
+            <Text style={[styles.segmentText, accountKind === 'customer' && styles.segmentTextActive]}>
+              I'm a Guest
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segment, accountKind === 'renter' && styles.segmentActive]}
+            onPress={() => setAccountKind('renter')}
+          >
+            <Text style={[styles.segmentText, accountKind === 'renter' && styles.segmentTextActive]}>
+              I'm a Renter
+            </Text>
+          </Pressable>
+        </View>
 
         <TextInput
           style={styles.input}
@@ -113,6 +164,17 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
         />
 
+        {accountKind === 'renter' ? (
+          <TextInput
+            style={styles.input}
+            placeholder="Address"
+            placeholderTextColor={colors.textMuted}
+            value={address}
+            onChangeText={setAddress}
+            multiline
+          />
+        ) : null}
+
         <Text style={styles.label}>ID type</Text>
         <View style={styles.segmentRow}>
           {DOCUMENT_TYPES.map((option) => (
@@ -140,6 +202,13 @@ export default function RegisterScreen() {
           value={documentNumber}
           onChangeText={setDocumentNumber}
         />
+
+        {accountKind === 'renter' ? (
+          <Text style={styles.hint}>
+            After signing up, an Admin will need to approve your Renter account before you can
+            post an Accommodation. You can still sign in and check your status in the meantime.
+          </Text>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -179,7 +248,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textMuted,
     marginTop: 4,
-    marginBottom: 28,
+    marginBottom: 20,
   },
   input: {
     borderWidth: 1,
@@ -222,6 +291,12 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: '#fff',
+  },
+  hint: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 14,
+    lineHeight: 18,
   },
   error: {
     color: colors.danger,

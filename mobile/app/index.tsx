@@ -25,7 +25,11 @@ export default function Index() {
   }
 
   if (user) {
-    return <Redirect href="/(customer)/home" />;
+    return user.role === 'renter' ? (
+      <Redirect href="/(renter)/dashboard" />
+    ) : (
+      <Redirect href="/(customer)/home" />
+    );
   }
 
   return <Redirect href="/(auth)/login" />;

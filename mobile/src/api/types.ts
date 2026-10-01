@@ -161,3 +161,77 @@ export interface ApiErrorBody {
   error: string;
   details?: unknown;
 }
+
+// --- Renter-specific shapes ---
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RegisterRenterResponse {
+  user: {
+    id: string | number;
+    role: UserRole;
+    email: string;
+    full_name: string;
+    created_at: string;
+  };
+  approvalStatus: ApprovalStatus;
+  idVerification: {
+    id: string | number;
+    status: 'verified' | 'failed';
+    provider: string;
+    cost_naira: string | number;
+    verified_at: string | null;
+  };
+}
+
+// GET /renters/me - a mix of snake_case (straight from the renters table, same convention as
+// listing rows) and the bank fields, which are null until updateBankDetails has been called.
+export interface RenterMe {
+  id: string | number;
+  email: string;
+  phone: string | null;
+  full_name: string;
+  address: string;
+  approval_status: ApprovalStatus;
+  approved_at: string | null;
+  rejection_reason: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_account_name: string | null;
+}
+
+export interface BankDetailsInput {
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+}
+
+// Renter-owned listing CRUD uses the same PublicAccommodation shape, except contact_info is
+// NOT stripped (the owner is allowed to see their own contact info) - a separate interface so
+// that distinction stays visible at the type level, even though the fields otherwise match.
+export interface OwnAccommodation extends Omit<PublicAccommodation, 'unitsAvailableForDates'> {
+  contact_info: string;
+}
+
+export interface CreateAccommodationInput {
+  type: AccommodationType;
+  state: string;
+  area?: string;
+  locationText: string;
+  description: string;
+  contactInfo: string;
+  numberOfUnits: number;
+  nightlyRentNaira: number;
+  amenities?: string[];
+}
+
+export type UpdateAccommodationInput = Partial<
+  Omit<CreateAccommodationInput, 'amenities'>
+>;
+
+export interface RequestImageUploadUrlResponse {
+  uploadUrl: string;
+  objectPath: string;
+  publicUrl: string;
+  expiresInSeconds: number;
+}
