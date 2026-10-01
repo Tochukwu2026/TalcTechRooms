@@ -12,6 +12,9 @@ export interface AuthUser {
   role: UserRole;
   email: string;
   fullName: string;
+  // Only present when role === 'customer' (see authService.login) - 'executive' gates the
+  // Live/Video Viewing booking feature on this screen; 'regular' Customers never see it.
+  tier?: 'regular' | 'executive';
 }
 
 export interface LoginResponse {
@@ -234,4 +237,36 @@ export interface RequestImageUploadUrlResponse {
   objectPath: string;
   publicUrl: string;
   expiresInSeconds: number;
+}
+
+// --- Executive Feature Viewing bookings (Customer-facing) ---
+
+export type ViewingType = 'live' | 'video';
+export type ViewingStatus = 'scheduled' | 'cancelled' | 'completed';
+
+// GET /accommodations/:id/viewings/video-availability and .../live-availability both return
+// this same shape (see viewingService.getVideoAvailability / getLiveAvailability) - `dates` is
+// a plain calendar list of the next 30 days for video, or only the Renter-marked/still-unbooked
+// dates for live.
+export interface ViewingAvailabilityResponse {
+  viewingType: ViewingType;
+  dates: string[];
+}
+
+// POST /accommodations/:id/viewings and GET /customers/me/viewings both return viewing_bookings
+// rows mapped to camelCase (see viewingService.toViewingResponse) - same convention as Booking.
+export interface Viewing {
+  id: string | number;
+  customerUserId: string | number;
+  accommodationId: string | number;
+  viewingType: ViewingType;
+  scheduledDate: string;
+  status: ViewingStatus;
+  assignedStaffUserId: string | number | null;
+  createdAt: string;
+}
+
+export interface BookViewingInput {
+  viewingType: ViewingType;
+  scheduledDate: string;
 }

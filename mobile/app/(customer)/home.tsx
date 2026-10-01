@@ -69,9 +69,16 @@ export default function HomeScreen() {
           <Text style={styles.title}>TalcTech Rooms</Text>
           {user ? <Text style={styles.greeting}>Hi, {user.fullName.split(' ')[0]}</Text> : null}
         </View>
-        <Pressable onPress={signOut}>
-          <Text style={styles.logout}>Log out</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          {user?.tier === 'executive' ? (
+            <Pressable onPress={() => router.push({ pathname: '/(customer)/viewings/my' })}>
+              <Text style={styles.myViewingsLink}>My Viewings</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={signOut}>
+            <Text style={styles.logout}>Log out</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.filters}>
@@ -168,6 +175,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  myViewingsLink: {
+    color: colors.goldDark,
+    fontSize: 14,
+    fontWeight: '600',
   },
   logout: {
     color: colors.danger,

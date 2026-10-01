@@ -14,12 +14,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAccommodation, getAvailability } from '@/api/accommodations';
 import type { AvailabilityResponse, PublicAccommodation } from '@/api/types';
 import { ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthContext';
 import { colors } from '@/theme/colors';
 import { ACCOMMODATION_TYPE_LABELS, formatNaira } from '@/utils/format';
 
 export default function ListingDetailScreen() {
   const params = useLocalSearchParams<{ id: string; checkIn?: string; checkOut?: string }>();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
   const [listing, setListing] = useState<PublicAccommodation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,6 +127,17 @@ export default function ListingDetailScreen() {
 
         <Text style={styles.sectionTitle}>Description</Text>
         <Text style={styles.description}>{listing.description}</Text>
+
+        {user?.tier === 'executive' ? (
+          <Pressable
+            style={styles.viewingButton}
+            onPress={() =>
+              router.push({ pathname: '/(customer)/viewings/[id]', params: { id: params.id } })
+            }
+          >
+            <Text style={styles.viewingButtonText}>Book a Viewing (Executive)</Text>
+          </Pressable>
+        ) : null}
 
         {listing.amenities.length > 0 ? (
           <>
@@ -283,6 +296,20 @@ const styles = StyleSheet.create({
   amenityText: {
     fontSize: 12,
     color: colors.text,
+  },
+  viewingButton: {
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 18,
+    backgroundColor: colors.surface,
+  },
+  viewingButtonText: {
+    color: colors.goldDark,
+    fontSize: 15,
+    fontWeight: '600',
   },
   dateRow: {
     flexDirection: 'row',

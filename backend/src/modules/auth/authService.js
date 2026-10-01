@@ -20,10 +20,18 @@ async function login({ email, password }) {
   }
 
   const token = signToken(user);
-  return {
-    token,
-    user: { id: user.id, role: user.role, email: user.email, fullName: user.full_name },
-  };
+  const responseUser = { id: user.id, role: user.role, email: user.email, fullName: user.full_name };
+
+  // Customer's `tier` ('regular' | 'executive') is included here so the mobile app can show/hide
+  // the Executive-only Live/Video Viewing booking tab right after login, instead of discovering
+  // the 403 only once the Customer taps into a listing (see viewingService.assertExecutiveCustomer
+  // for the server-side enforcement this mirrors - this is purely for the client's own UI gating).
+  if (user.role === 'customer') {
+    const { rows: customerRows } = await pool.query('SELECT tier FROM customers WHERE user_id = $1', [user.id]);
+    responseUser.tier = customerRows[0]?.tier ?? 'regular';
+  }
+
+  return { token, user: responseUser };
 }
 
 module.exports = { login };
