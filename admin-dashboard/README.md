@@ -77,8 +77,9 @@ src/
 
 ## Deployment
 
-Not yet deployed anywhere (matches the backend's own GCP setup being "still to do" — see the
-decisions log). `npm run build` produces a static `dist/` folder that can be hosted anywhere
-static files can be served (a GCS bucket + Cloud CDN would match the backend's GCP choice);
-point `VITE_API_BASE_URL` (baked in at build time) at the real backend URL before building for
-that environment.
+**See `DEPLOY.md`** — a step-by-step runbook (the founder runs this themselves, same pattern
+as `../backend/DEPLOY.md`) for deploying this as a real website on Google Cloud Run: a small
+Dockerfile builds the Vite app and serves the static output via nginx, no Node process stays
+running in production. `.env.production` (committed — it's just the backend's already-public
+URL, not a secret) already points at the real, live Cloud Run backend, so the build is
+ready to deploy as-is.
