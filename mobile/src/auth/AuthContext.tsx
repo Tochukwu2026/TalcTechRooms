@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { router } from 'expo-router';
 import { login as apiLogin, registerCustomer as apiRegisterCustomer, RegisterCustomerInput } from '@/api/auth';
 import { registerRenter as apiRegisterRenter, RegisterRenterInput } from '@/api/renters';
 import { setStoredToken, getStoredToken } from '@/api/client';
@@ -89,6 +90,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setStoredToken(null);
     await SecureStore.deleteItemAsync(USER_KEY);
     setUser(null);
+    // Clearing `user` alone doesn't move the app off whatever screen is currently showing
+    // (expo-router doesn't automatically redirect just because the auth state changed) - without
+    // this, the signed-out Renter/Customer screen just sits there (its own data-fetch may even
+    // spin forever once the token is gone and its request 401s). Route back to the launch
+    // screen, which re-checks `user` and redirects to /(auth)/login for a null user.
+    router.replace('/');
   }, []);
 
   const value = useMemo(
