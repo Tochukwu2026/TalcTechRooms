@@ -27,6 +27,9 @@ export default function Layout() {
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Business Settings
           </NavLink>
+          <NavLink to="/users" className={({ isActive }) => (isActive ? 'active' : '')}>
+            User Accounts
+          </NavLink>
         </nav>
         <div className="sidebar-footer">
           <div className="user">{session.user.fullName}</div>

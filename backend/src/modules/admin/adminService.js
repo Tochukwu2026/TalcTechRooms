@@ -138,6 +138,64 @@ async function updateSetting(key, value) {
   return rows[0];
 }
 
+// --- Account deactivation/reactivation (spec/decisions-and-phasing.md > Build Phasing) ---
+// Admin-only, soft (reversible) - a deactivated account can't log in (see authService.login
+// and the authenticate middleware's own is_active check, which also cuts off an
+// already-signed-in session immediately rather than waiting for its token to expire) but every
+// row it owns (bookings, listings, payout/viewing history) is untouched, and its email stays
+// reserved to it rather than being freed for a new signup - so reactivating is a true undo.
+
+async function listUsers({ role, search } = {}) {
+  const conditions = [];
+  const params = [];
+  if (role) {
+    params.push(role);
+    conditions.push(`role = $${params.length}`);
+  }
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(`(email ILIKE $${params.length} OR full_name ILIKE $${params.length})`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const { rows } = await pool.query(
+    `SELECT id, role, email, full_name, phone, is_active, created_at
+     FROM users
+     ${where}
+     ORDER BY created_at DESC`,
+    params
+  );
+  return rows;
+}
+
+async function deactivateUser({ userId, adminUserId }) {
+  if (Number(userId) === Number(adminUserId)) {
+    throw new ApiError(400, 'You cannot deactivate your own account.');
+  }
+  const { rows } = await pool.query(
+    `UPDATE users SET is_active = false, updated_at = now()
+     WHERE id = $1
+     RETURNING id, role, email, full_name, is_active`,
+    [userId]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, 'User not found.');
+  }
+  return rows[0];
+}
+
+async function reactivateUser(userId) {
+  const { rows } = await pool.query(
+    `UPDATE users SET is_active = true, updated_at = now()
+     WHERE id = $1
+     RETURNING id, role, email, full_name, is_active`,
+    [userId]
+  );
+  if (rows.length === 0) {
+    throw new ApiError(404, 'User not found.');
+  }
+  return rows[0];
+}
+
 module.exports = {
   listPendingRenters,
   approveRenter,
@@ -148,4 +206,7 @@ module.exports = {
   createPriceCap,
   listSettings,
   updateSetting,
+  listUsers,
+  deactivateUser,
+  reactivateUser,
 };

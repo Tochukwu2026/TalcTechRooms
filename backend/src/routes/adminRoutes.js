@@ -12,6 +12,9 @@ const {
   createPriceCap,
   listSettings,
   updateSetting,
+  listUsers,
+  deactivateUser,
+  reactivateUser,
 } = require('../modules/admin/adminService');
 const payoutService = require('../modules/payout/payoutService');
 const viewingService = require('../modules/viewings/viewingService');
@@ -150,6 +153,34 @@ router.patch(
   validateBody(assignStaffSchema),
   asyncHandler(async (req, res) => {
     res.json(await viewingService.assignStaff(Number(req.params.id), req.body.staffUserId));
+  })
+);
+
+// --- Account deactivation/reactivation ---
+// Admin-only, soft (reversible) - see adminService.js for the full rationale and
+// spec/decisions-and-phasing.md > Build Phasing for the founder's decisions.
+
+router.get(
+  '/users',
+  asyncHandler(async (req, res) => {
+    const { role, search } = req.query;
+    res.json(await listUsers({ role, search }));
+  })
+);
+
+router.patch(
+  '/users/:id/deactivate',
+  asyncHandler(async (req, res) => {
+    const result = await deactivateUser({ userId: Number(req.params.id), adminUserId: req.user.id });
+    res.json(result);
+  })
+);
+
+router.patch(
+  '/users/:id/reactivate',
+  asyncHandler(async (req, res) => {
+    const result = await reactivateUser(Number(req.params.id));
+    res.json(result);
   })
 );
 

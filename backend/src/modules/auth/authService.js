@@ -5,7 +5,7 @@ const ApiError = require('../../utils/ApiError');
 
 async function login({ email, password }) {
   const { rows } = await pool.query(
-    'SELECT id, role, email, full_name, password_hash FROM users WHERE email = $1',
+    'SELECT id, role, email, full_name, password_hash, is_active FROM users WHERE email = $1',
     [email]
   );
   const user = rows[0];
@@ -17,6 +17,15 @@ async function login({ email, password }) {
   const ok = await verifyPassword(password, user.password_hash);
   if (!ok) {
     throw new ApiError(401, 'Invalid email or password.');
+  }
+
+  // Checked after the password verifies (not before) so a wrong password and a deactivated
+  // account both still read as "Invalid email or password" up to this point - we don't want a
+  // guesser to be able to tell a deactivated account's email apart from a wrong/nonexistent one.
+  // Once the password is confirmed correct, it's the account owner (or someone with their
+  // password), so a specific, clear message is the right thing to show them here.
+  if (!user.is_active) {
+    throw new ApiError(403, 'This account has been deactivated. Contact TalcTech support.');
   }
 
   const token = signToken(user);

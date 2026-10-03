@@ -285,6 +285,12 @@ button:disabled {
   color: var(--danger);
 }
 
+/* users.is_active */
+.badge-deactivated {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
 .error-banner {
   background: var(--danger-bg);
   color: var(--danger);
