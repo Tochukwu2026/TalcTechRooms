@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
+import { getExecutiveSubscriptionPreview } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { colors } from '@/theme/colors';
+import { formatNaira } from '@/utils/format';
 
 const DOCUMENT_TYPES: { value: 'nin' | 'passport' | 'pvc'; label: string }[] = [
   { value: 'nin', label: 'NIN' },
@@ -35,11 +37,23 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState(''); // Renter only
+  const [tier, setTier] = useState<'regular' | 'executive'>('regular'); // Customer only
   const [documentType, setDocumentType] = useState<'nin' | 'passport' | 'pvc'>('nin');
   const [documentNumber, setDocumentNumber] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [executivePriceNaira, setExecutivePriceNaira] = useState<number | null>(null);
+
+  // Fetch the real Executive-tier monthly price once, so the toggle below shows an actual
+  // figure rather than nothing - this is a public, unauthenticated endpoint (no login needed to
+  // see pricing before signing up). A failure here just leaves the price line off; it doesn't
+  // block registration.
+  useEffect(() => {
+    getExecutiveSubscriptionPreview()
+      .then((preview) => setExecutivePriceNaira(preview.totalChargedNaira))
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit() {
     setError(null);
@@ -83,6 +97,7 @@ export default function RegisterScreen() {
           phone: phone.trim() || undefined,
           fullName: fullName.trim(),
           password,
+          tier,
           documentType,
           documentNumber: documentNumber.trim(),
         });
@@ -173,6 +188,33 @@ export default function RegisterScreen() {
             onChangeText={setAddress}
             multiline
           />
+        ) : null}
+
+        {accountKind === 'customer' ? (
+          <>
+            <Text style={styles.label}>Account tier</Text>
+            <View style={styles.segmentRow}>
+              <Pressable
+                style={[styles.segment, tier === 'regular' && styles.segmentActive]}
+                onPress={() => setTier('regular')}
+              >
+                <Text style={[styles.segmentText, tier === 'regular' && styles.segmentTextActive]}>Regular</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.segment, tier === 'executive' && styles.segmentActive]}
+                onPress={() => setTier('executive')}
+              >
+                <Text style={[styles.segmentText, tier === 'executive' && styles.segmentTextActive]}>Executive</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.hint}>
+              {tier === 'executive'
+                ? `Executive adds Live and Video Viewing bookings before you stay${
+                    executivePriceNaira ? ` (currently ${formatNaira(executivePriceNaira)}/month once billing is live)` : ''
+                  }. No charge for this yet - subscription billing isn't wired up.`
+                : 'Regular Customers can search and book stays. Switch to Executive above to also unlock Live/Video Viewing bookings.'}
+            </Text>
+          </>
         ) : null}
 
         <Text style={styles.label}>ID type</Text>

@@ -270,3 +270,11 @@ export interface BookViewingInput {
   viewingType: ViewingType;
   scheduledDate: string;
 }
+
+// GET /customers/executive-subscription-cost - see checkoutService.getExecutiveSubscriptionPreview.
+export interface ExecutiveSubscriptionPreview {
+  baseFeeNaira: number;
+  adminCostsNaira: number;
+  vatNaira: number;
+  totalChargedNaira: number;
+}
