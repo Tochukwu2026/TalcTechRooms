@@ -15,6 +15,7 @@ import { getAccommodation, getAvailability } from '@/api/accommodations';
 import type { AvailabilityResponse, PublicAccommodation } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import DateField from '@/components/DateField';
 import { colors } from '@/theme/colors';
 import { ACCOMMODATION_TYPE_LABELS, formatNaira } from '@/utils/format';
 
@@ -154,19 +155,19 @@ export default function ListingDetailScreen() {
 
         <Text style={styles.sectionTitle}>Check availability</Text>
         <View style={styles.dateRow}>
-          <TextInput
-            style={[styles.input, styles.dateInput]}
-            placeholder="Check-in (YYYY-MM-DD)"
-            placeholderTextColor={colors.textMuted}
+          <DateField
+            label="Check-in"
             value={checkIn}
-            onChangeText={setCheckIn}
+            onChange={setCheckIn}
+            minimumDate={new Date()}
+            style={styles.dateInput}
           />
-          <TextInput
-            style={[styles.input, styles.dateInput]}
-            placeholder="Check-out (YYYY-MM-DD)"
-            placeholderTextColor={colors.textMuted}
+          <DateField
+            label="Check-out"
             value={checkOut}
-            onChangeText={setCheckOut}
+            onChange={setCheckOut}
+            minimumDate={checkIn ? new Date(checkIn) : new Date()}
+            style={styles.dateInput}
           />
         </View>
         <View style={styles.unitsRow}>

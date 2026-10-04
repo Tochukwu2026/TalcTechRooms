@@ -52,7 +52,7 @@ export default function RenterDashboardScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>TalcTech Rooms</Text>
+          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
           {user ? <Text style={styles.greeting}>Hi, {user.fullName.split(' ')[0]}</Text> : null}
         </View>
         <Pressable onPress={signOut}>
@@ -168,6 +168,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: colors.goldDark,
+  },
+  logo: {
+    width: 120,
+    height: 90,
   },
   greeting: {
     fontSize: 13,

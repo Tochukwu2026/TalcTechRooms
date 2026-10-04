@@ -15,6 +15,8 @@ import { searchAccommodations } from '@/api/accommodations';
 import type { PublicAccommodation } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import DateField from '@/components/DateField';
+import HeroCarousel from '@/components/HeroCarousel';
 import { colors } from '@/theme/colors';
 import { ACCOMMODATION_TYPE_LABELS, formatNaira } from '@/utils/format';
 
@@ -66,7 +68,7 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>TalcTech Rooms</Text>
+          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
           {user ? <Text style={styles.greeting}>Hi, {user.fullName.split(' ')[0]}</Text> : null}
         </View>
         <View style={styles.headerActions}>
@@ -81,6 +83,8 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      <HeroCarousel />
+
       <View style={styles.filters}>
         <TextInput
           style={styles.input}
@@ -90,19 +94,19 @@ export default function HomeScreen() {
           onChangeText={setState}
         />
         <View style={styles.dateRow}>
-          <TextInput
-            style={[styles.input, styles.dateInput]}
-            placeholder="Check-in (YYYY-MM-DD)"
-            placeholderTextColor={colors.textMuted}
+          <DateField
+            label="Check-in"
             value={checkIn}
-            onChangeText={setCheckIn}
+            onChange={setCheckIn}
+            minimumDate={new Date()}
+            style={styles.dateInput}
           />
-          <TextInput
-            style={[styles.input, styles.dateInput]}
-            placeholder="Check-out (YYYY-MM-DD)"
-            placeholderTextColor={colors.textMuted}
+          <DateField
+            label="Check-out"
             value={checkOut}
-            onChangeText={setCheckOut}
+            onChange={setCheckOut}
+            minimumDate={checkIn ? new Date(checkIn) : new Date()}
+            style={styles.dateInput}
           />
         </View>
         <Pressable style={styles.searchButton} onPress={runSearch} disabled={isSearching}>
@@ -170,6 +174,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: colors.goldDark,
+  },
+  logo: {
+    width: 120,
+    height: 90,
   },
   greeting: {
     fontSize: 13,
