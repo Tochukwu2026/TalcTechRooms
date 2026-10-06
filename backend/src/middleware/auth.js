@@ -29,16 +29,20 @@ async function authenticate(req, res, next) {
     return next(new ApiError(401, 'Invalid or expired token.'));
   }
 
+  let userRow;
   try {
-    const { rows } = await pool.query('SELECT is_active FROM users WHERE id = $1', [payload.sub]);
+    const { rows } = await pool.query('SELECT is_active, email FROM users WHERE id = $1', [payload.sub]);
     if (rows.length === 0 || !rows[0].is_active) {
       return next(new ApiError(403, 'This account has been deactivated. Contact TalcTech support.'));
     }
+    userRow = rows[0];
   } catch (err) {
     return next(err);
   }
 
-  req.user = { id: payload.sub, role: payload.role, email: payload.email };
+  // Email comes from the DB, not the JWT: a Customer can change their email in Settings, and the
+  // token issued at login still carries the old one.
+  req.user = { id: payload.sub, role: payload.role, email: userRow.email };
   return next();
 }
 

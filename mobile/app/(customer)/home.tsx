@@ -77,6 +77,9 @@ export default function HomeScreen() {
               <Text style={styles.myViewingsLink}>My Viewings</Text>
             </Pressable>
           ) : null}
+          <Pressable onPress={() => router.push('/(customer)/account')}>
+            <Text style={styles.myViewingsLink}>Account</Text>
+          </Pressable>
           <Pressable onPress={signOut}>
             <Text style={styles.logout}>Log out</Text>
           </Pressable>
@@ -185,9 +188,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   headerActions: {
+    flexShrink: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 16,
+    columnGap: 14,
+    rowGap: 6,
   },
   myViewingsLink: {
     color: colors.goldDark,

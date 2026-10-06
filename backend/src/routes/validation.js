@@ -23,6 +23,19 @@ const customerRegisterSchema = z.object({
   tier: z.enum(['regular', 'executive']).optional(),
 }).merge(documentSchema);
 
+// Customer's own account settings (see modules/customers/accountService.js). Full name is not
+// editable on purpose. currentPassword is only enforced by the service when the email changes.
+const updateCustomerProfileSchema = z.object({
+  email: z.string().email().optional(),
+  phone: z.union([z.string().min(7).max(20), z.literal('')]).optional(),
+  currentPassword: z.string().min(1).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -231,6 +244,8 @@ function validateQuery(schema) {
 module.exports = {
   renterRegisterSchema,
   customerRegisterSchema,
+  updateCustomerProfileSchema,
+  changePasswordSchema,
   loginSchema,
   createAccommodationSchema,
   updateAccommodationSchema,

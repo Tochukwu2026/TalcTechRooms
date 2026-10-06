@@ -8,6 +8,7 @@ const { Router } = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const payments = require('../modules/payments');
 const bookingService = require('../modules/booking/bookingService');
+const executiveUpgradeService = require('../modules/customers/executiveUpgradeService');
 
 const router = Router();
 
@@ -27,7 +28,13 @@ router.post(
     // charge.success is relevant to booking creation; everything else is acknowledged and
     // ignored so Paystack doesn't keep retrying delivery.
     if (event?.event === 'charge.success' && event.data?.reference) {
-      await bookingService.finalizeBooking(event.data.reference);
+      // Booking charges and Executive-upgrade charges both arrive here - route by the kind the
+      // charge was tagged with when it was initialized (a booking is the default, as before).
+      if (event.data.metadata?.kind === 'executive_subscription') {
+        await executiveUpgradeService.finalizeUpgrade(event.data.reference);
+      } else {
+        await bookingService.finalizeBooking(event.data.reference);
+      }
     }
 
     // Paystack expects a fast 200 regardless of what finalizeBooking decided (payment_failed/

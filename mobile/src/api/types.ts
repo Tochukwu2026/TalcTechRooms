@@ -278,3 +278,31 @@ export interface ExecutiveSubscriptionPreview {
   vatNaira: number;
   totalChargedNaira: number;
 }
+
+// GET/PATCH /customers/me - see backend accountService.js. Full name is read-only by design.
+export interface CustomerProfile {
+  id: string | number;
+  email: string;
+  phone: string | null;
+  fullName: string;
+  tier: 'regular' | 'executive';
+  // End of the paid Executive month, or null for a Regular Customer.
+  executivePeriodEndsAt: string | null;
+}
+
+// POST /customers/me/executive-upgrade/initialize - see backend executiveUpgradeService.js.
+export interface InitializeUpgradeResponse {
+  reference: string;
+  authorizationUrl: string;
+  totalChargedNaira: number;
+}
+
+// POST /customers/me/executive-upgrade/verify/:reference
+export interface VerifyUpgradeResponse {
+  status: 'upgraded' | 'already_finalized';
+  tier: 'executive';
+  subscription: {
+    totalChargedNaira: number;
+    currentPeriodEndsAt: string | null;
+  };
+}

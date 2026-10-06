@@ -25,6 +25,9 @@ interface AuthContextValue {
   // approval is a separate manual Admin step - see renterRoutes.js/adminService), not here.
   registerRenterAndSignIn: (input: RegisterRenterInput) => Promise<{ idVerificationPassed: boolean }>;
   signOut: () => Promise<void>;
+  // Merges changes (e.g. a new email, or tier: 'executive' after an upgrade) into the signed-in
+  // user and re-saves it, so the rest of the app sees them without a fresh login.
+  updateUser: (patch: Partial<AuthUser>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -86,6 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistSession]
   );
 
+  const updateUser = useCallback(
+    async (patch: Partial<AuthUser>) => {
+      if (!user) return;
+      const next = { ...user, ...patch };
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(next));
+      setUser(next);
+    },
+    [user]
+  );
+
   const signOut = useCallback(async () => {
     await setStoredToken(null);
     await SecureStore.deleteItemAsync(USER_KEY);
@@ -99,8 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut }),
-    [user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut]
+    () => ({ user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut, updateUser }),
+    [user, isLoading, signIn, registerAndSignIn, registerRenterAndSignIn, signOut, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

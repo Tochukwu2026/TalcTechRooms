@@ -274,4 +274,4 @@ async function getBookingForCustomer(bookingId, customerUserId) {
   return toBookingResponse(rows[0]);
 }
 
-module.exports = { initializeBooking, finalizeBooking, getBookingForCustomer };
+module.exports = { initializeBooking, finalizeBooking, getBookingForCustomer, assertCustomerIdVerified };
