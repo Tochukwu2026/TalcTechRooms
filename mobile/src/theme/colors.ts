@@ -11,3 +11,13 @@ export const colors = {
   danger: '#C0392B',
   success: '#1E7A46',
 };
+
+// Sky Blue theme - founder chose this for the Customer homepage on 2026-10-08 (picked from the
+// colour mock-ups). Applied only where a screen opts in; every other screen still uses `colors`.
+export const skyBlueTheme = {
+  accent: '#0EA5E9',
+  accentDark: '#0369A1',
+  background: '#F7FCFF',
+  surface: '#EAF6FD',
+  border: '#BFE3F6',
+};

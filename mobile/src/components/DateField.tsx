@@ -28,9 +28,11 @@ interface DateFieldProps {
   minimumDate?: Date;
   maximumDate?: Date;
   style?: object;
+  // Optional colour override; defaults to the gold palette.
+  theme?: { accentDark: string; surface: string; border: string };
 }
 
-export default function DateField({ label, value, onChange, minimumDate, maximumDate, style }: DateFieldProps) {
+export default function DateField({ label, value, onChange, minimumDate, maximumDate, style, theme }: DateFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   function handleChange(event: DateTimePickerEvent, selected?: Date) {
@@ -47,7 +49,9 @@ export default function DateField({ label, value, onChange, minimumDate, maximum
 
   return (
     <>
-      <Pressable style={[styles.field, style]} onPress={() => setIsOpen(true)}>
+      <Pressable
+        style={[styles.field, theme && { borderColor: theme.border, backgroundColor: theme.surface }, style]}
+        onPress={() => setIsOpen(true)}>
         <Text style={styles.label}>{label}</Text>
         <Text style={value ? styles.value : styles.placeholder}>{value || 'Select date'}</Text>
       </Pressable>
@@ -64,7 +68,7 @@ export default function DateField({ label, value, onChange, minimumDate, maximum
       {/* iOS's inline picker has no built-in "Done" button - this closes it. */}
       {isOpen && Platform.OS === 'ios' ? (
         <Pressable style={styles.doneButton} onPress={() => setIsOpen(false)}>
-          <Text style={styles.doneButtonText}>Done</Text>
+          <Text style={[styles.doneButtonText, theme && { color: theme.accentDark }]}>Done</Text>
         </Pressable>
       ) : null}
     </>
