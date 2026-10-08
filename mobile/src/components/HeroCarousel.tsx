@@ -12,12 +12,13 @@ const SLIDE_WIDTH = SCREEN_WIDTH - 40; // matches the 20px screen gutters used e
 const SLIDE_HEIGHT = 180;
 const SLIDE_SPACING = 20; // left gutter of the next slide peeking in, snapped to below
 
+// Order shown in the carousel. hero-5 (the green-bed bedroom) leads - founder's choice 2026-10-08.
 const HERO_IMAGES = [
+  require('../../assets/hero/hero-5.jpg'),
   require('../../assets/hero/hero-1.jpg'),
   require('../../assets/hero/hero-2.jpg'),
   require('../../assets/hero/hero-3.jpg'),
   require('../../assets/hero/hero-4.jpg'),
-  require('../../assets/hero/hero-5.jpg'),
 ];
 
 export default function HeroCarousel({ theme }: HeroCarouselProps) {
