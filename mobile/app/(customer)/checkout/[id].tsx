@@ -114,7 +114,7 @@ export default function CheckoutScreen() {
   if (isLoadingPreview) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   primaryButton: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 16,
     alignItems: 'center',
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   backLinkText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '600',
   },
   webviewHeader: {
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   webviewHeaderButtonPrimary: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '700',
   },
   webview: {

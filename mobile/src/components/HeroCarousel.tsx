@@ -2,11 +2,6 @@ import { useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, StyleSheet, View, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { colors } from '@/theme/colors';
 
-interface HeroCarouselProps {
-  // Optional accent override; defaults to the gold palette.
-  theme?: { accent: string; border: string };
-}
-
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SLIDE_WIDTH = SCREEN_WIDTH - 40; // matches the 20px screen gutters used elsewhere on this screen
 const SLIDE_HEIGHT = 180;
@@ -21,9 +16,7 @@ const HERO_IMAGES = [
   require('../../assets/hero/hero-4.jpg'),
 ];
 
-export default function HeroCarousel({ theme }: HeroCarouselProps) {
-  const accent = theme?.accent ?? colors.gold;
-  const inactive = theme?.border ?? colors.border;
+export default function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -56,11 +49,7 @@ export default function HeroCarousel({ theme }: HeroCarouselProps) {
         {HERO_IMAGES.map((_, index) => (
           <View
             key={`dot-${index}`}
-            style={[
-              styles.dot,
-              { backgroundColor: inactive },
-              index === activeIndex && [styles.dotActive, { backgroundColor: accent }],
-            ]}
+            style={[styles.dot, index === activeIndex && styles.dotActive]}
           />
         ))}
       </View>
@@ -95,7 +84,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   dotActive: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     width: 16,
   },
 });

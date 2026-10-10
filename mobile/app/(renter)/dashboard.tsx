@@ -43,7 +43,7 @@ export default function RenterDashboardScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: colors.goldDark,
+    color: colors.accentDark,
   },
   logo: {
     width: 120,
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -235,13 +235,13 @@ const styles = StyleSheet.create({
   actionButtonSecondary: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
   },
   actionButtonSecondaryText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   cardType: {
     fontSize: 13,
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '600',
   },
   statusPill: {

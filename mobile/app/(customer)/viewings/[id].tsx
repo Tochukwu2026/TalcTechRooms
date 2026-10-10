@@ -92,7 +92,7 @@ export default function BookViewingScreen() {
   if (isLoadingListing) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -161,7 +161,7 @@ export default function BookViewingScreen() {
         </Text>
 
         {isLoadingDates ? (
-          <ActivityIndicator color={colors.gold} style={styles.datesLoading} />
+          <ActivityIndicator color={colors.accent} style={styles.datesLoading} />
         ) : datesError ? (
           <Text style={styles.error}>{datesError}</Text>
         ) : dates.length === 0 ? (
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -260,8 +260,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   tabActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   tabText: {
     fontSize: 14,
@@ -301,8 +301,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   dateChipActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   dateChipText: {
     fontSize: 12,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   primaryButton: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   backLinkText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '600',
   },
   confirmTitle: {

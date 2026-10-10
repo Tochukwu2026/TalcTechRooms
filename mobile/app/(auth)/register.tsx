@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: colors.goldDark,
+    color: colors.accentDark,
   },
   subtitle: {
     fontSize: 15,
@@ -323,8 +323,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   segmentText: {
     fontSize: 13,
@@ -346,12 +346,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   notice: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     marginBottom: 14,
     fontSize: 14,
   },
   button: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 14,
     fontWeight: '500',
   },

@@ -152,7 +152,7 @@ export default function AccountScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -300,7 +300,7 @@ export default function AccountScreen() {
 
             <Pressable style={styles.secondaryButton} onPress={savePassword} disabled={isSavingPassword}>
               {isSavingPassword ? (
-                <ActivityIndicator color={colors.goldDark} />
+                <ActivityIndicator color={colors.accentDark} />
               ) : (
                 <Text style={styles.secondaryButtonText}>Change password</Text>
               )}
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   cardExecutive: {
-    borderColor: colors.gold,
+    borderColor: colors.accent,
   },
   cardLabel: {
     fontSize: 12,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   primaryButton: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
@@ -436,14 +436,14 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
   },
   secondaryButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '700',
   },

@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '700',
-    color: colors.goldDark,
+    color: colors.accentDark,
     textAlign: 'center',
   },
   subtitle: {
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   button: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   linkText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 14,
     fontWeight: '500',
   },

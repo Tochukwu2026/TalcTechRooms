@@ -77,7 +77,7 @@ export default function BankDetailsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -194,8 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   chipText: {
     fontSize: 13,
@@ -222,12 +222,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   notice: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     marginBottom: 14,
     fontSize: 14,
   },
   button: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',

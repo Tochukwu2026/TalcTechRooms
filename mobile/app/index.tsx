@@ -19,7 +19,7 @@ export default function Index() {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>TalcTech Rooms</Text>
-        <ActivityIndicator size="large" color={colors.gold} style={styles.spinner} />
+        <ActivityIndicator size="large" color={colors.accent} style={styles.spinner} />
       </View>
     );
   }
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.goldDark,
+    color: colors.accentDark,
     marginBottom: 24,
   },
   spinner: {

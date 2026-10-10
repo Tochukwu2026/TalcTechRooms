@@ -17,7 +17,7 @@ import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import DateField from '@/components/DateField';
 import HeroCarousel from '@/components/HeroCarousel';
-import { colors, skyBlueTheme as sky } from '@/theme/colors';
+import { colors } from '@/theme/colors';
 import { ACCOMMODATION_TYPE_LABELS, formatNaira } from '@/utils/format';
 
 export default function HomeScreen() {
@@ -86,7 +86,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <HeroCarousel theme={sky} />
+      <HeroCarousel />
 
       <View style={styles.filters}>
         <TextInput
@@ -98,7 +98,6 @@ export default function HomeScreen() {
         />
         <View style={styles.dateRow}>
           <DateField
-            theme={sky}
             label="Check-in"
             value={checkIn}
             onChange={setCheckIn}
@@ -106,7 +105,6 @@ export default function HomeScreen() {
             style={styles.dateInput}
           />
           <DateField
-            theme={sky}
             label="Check-out"
             value={checkOut}
             onChange={setCheckOut}
@@ -165,7 +163,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: sky.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -178,7 +176,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: sky.accentDark,
+    color: colors.accentDark,
   },
   logo: {
     width: 120,
@@ -199,7 +197,7 @@ const styles = StyleSheet.create({
     rowGap: 6,
   },
   myViewingsLink: {
-    color: sky.accentDark,
+    color: colors.accentDark,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -214,13 +212,13 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: sky.border,
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 15,
     color: colors.text,
-    backgroundColor: sky.surface,
+    backgroundColor: colors.surface,
     marginBottom: 10,
   },
   dateRow: {
@@ -231,7 +229,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchButton: {
-    backgroundColor: sky.accent,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -252,11 +250,11 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: sky.border,
+    borderColor: colors.border,
     borderRadius: 14,
     marginBottom: 16,
     overflow: 'hidden',
-    backgroundColor: sky.surface,
+    backgroundColor: colors.surface,
   },
   cardImage: {
     width: '100%',
@@ -265,7 +263,7 @@ const styles = StyleSheet.create({
   cardImagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: sky.border,
+    backgroundColor: colors.border,
   },
   cardImagePlaceholderText: {
     color: colors.textMuted,
@@ -276,7 +274,7 @@ const styles = StyleSheet.create({
   },
   cardType: {
     fontSize: 13,
-    color: sky.accentDark,
+    color: colors.accentDark,
     fontWeight: '600',
     marginBottom: 2,
   },

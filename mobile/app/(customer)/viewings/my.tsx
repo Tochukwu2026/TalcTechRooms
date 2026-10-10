@@ -68,7 +68,7 @@ export default function MyViewingsScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {isLoading ? (
-        <ActivityIndicator size="large" color={colors.gold} style={styles.loading} />
+        <ActivityIndicator size="large" color={colors.accent} style={styles.loading} />
       ) : (
         <FlatList
           data={viewings}
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 8,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   statusScheduled: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     backgroundColor: '#F3E9C9',
   },
   statusCompleted: {

@@ -83,7 +83,7 @@ export default function ListingDetailScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -182,7 +182,7 @@ export default function ListingDetailScreen() {
 
         <Pressable style={styles.secondaryButton} onPress={checkAvailability} disabled={isCheckingAvailability}>
           {isCheckingAvailability ? (
-            <ActivityIndicator color={colors.goldDark} />
+            <ActivityIndicator color={colors.accentDark} />
           ) : (
             <Text style={styles.secondaryButtonText}>Check Availability</Text>
           )}
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   type: {
     fontSize: 13,
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '600',
   },
   location: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   viewingButton: {
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   viewingButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -354,14 +354,14 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
     marginTop: 4,
   },
   secondaryButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   primaryButton: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   backLinkText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontWeight: '600',
   },
 });

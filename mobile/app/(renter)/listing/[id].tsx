@@ -242,7 +242,7 @@ export default function ManageListingScreen() {
   if (isLoading || !listing) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -293,7 +293,7 @@ export default function ManageListingScreen() {
           ))}
           <Pressable style={styles.addImageButton} onPress={pickAndUploadImage} disabled={isUploadingImage}>
             {isUploadingImage ? (
-              <ActivityIndicator color={colors.goldDark} />
+              <ActivityIndicator color={colors.accentDark} />
             ) : (
               <Text style={styles.addImageButtonText}>+ Add{'\n'}Photo</Text>
             )}
@@ -365,7 +365,7 @@ export default function ManageListingScreen() {
         </View>
         <Pressable style={styles.buttonSecondary} onPress={saveAmenities} disabled={isSavingAmenities}>
           {isSavingAmenities ? (
-            <ActivityIndicator color={colors.goldDark} />
+            <ActivityIndicator color={colors.accentDark} />
           ) : (
             <Text style={styles.buttonSecondaryText}>Save Amenities</Text>
           )}
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   notice: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     marginBottom: 12,
     fontSize: 14,
   },
@@ -511,13 +511,13 @@ const styles = StyleSheet.create({
     height: 110,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
   addImageButtonText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   button: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
@@ -563,14 +563,14 @@ const styles = StyleSheet.create({
   },
   buttonSecondary: {
     borderWidth: 1,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
   },
   buttonSecondaryText: {
-    color: colors.goldDark,
+    color: colors.accentDark,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -589,8 +589,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   chipText: {
     fontSize: 13,
@@ -616,8 +616,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   dateChipActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   dateChipBooked: {
     backgroundColor: colors.border,
