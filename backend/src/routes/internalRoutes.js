@@ -7,6 +7,7 @@ const { Router } = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const requireSchedulerSecret = require('../middleware/requireSchedulerSecret');
 const { evaluateCheckInDayPayouts } = require('../jobs/evaluateCheckInDayPayouts');
+const { renewExecutiveSubscriptions } = require('../jobs/renewExecutiveSubscriptions');
 
 const router = Router();
 
@@ -20,6 +21,17 @@ router.post(
   asyncHandler(async (req, res) => {
     const result = await evaluateCheckInDayPayouts();
     res.json(result);
+  })
+);
+
+// POST /internal/renew-subscriptions - charges the next month for every Executive period that has
+// ended (or downgrades the Customer to Regular if auto-renewal is off / the charge is declined).
+// Idempotent, so Cloud Scheduler can call it hourly or daily and retry freely.
+router.post(
+  '/renew-subscriptions',
+  requireSchedulerSecret,
+  asyncHandler(async (req, res) => {
+    res.json(await renewExecutiveSubscriptions());
   })
 );
 

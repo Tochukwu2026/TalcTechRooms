@@ -18,7 +18,9 @@ interface AuthContextValue {
   // Registers the Customer, then signs them in immediately (register itself returns no
   // token - see backend customerService.registerCustomer) so there's one smooth flow instead
   // of asking them to log in again right after signing up.
-  registerAndSignIn: (input: RegisterCustomerInput) => Promise<{ idVerificationPassed: boolean }>;
+  registerAndSignIn: (
+    input: RegisterCustomerInput
+  ) => Promise<{ idVerificationPassed: boolean; executivePaymentRequired: boolean }>;
   // Same pattern as registerAndSignIn: registerRenter (backend renterService.registerRenter)
   // returns no token either, and succeeds regardless of whether ID verification or Admin
   // approval has happened yet - both of those are checked later (verification already ran;
@@ -73,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // their verification status; booking endpoints will reject them if unverified.
       const loginResult = await apiLogin(input.email, input.password);
       await persistSession(loginResult.token, loginResult.user);
-      return { idVerificationPassed };
+      return { idVerificationPassed, executivePaymentRequired: Boolean(result.executivePaymentRequired) };
     },
     [persistSession]
   );

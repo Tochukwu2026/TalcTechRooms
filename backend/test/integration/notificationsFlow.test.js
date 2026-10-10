@@ -70,6 +70,10 @@ async function registerCustomer(email = 'jane@example.com', overrides = {}) {
   };
   const res = await request(app).post('/customers/register').send(payload);
   assert.equal(res.status, 201, JSON.stringify(res.body));
+  if (payload.tier === 'executive') {
+    // Registration never grants Executive by itself (it must be paid for) - promote directly for these tests.
+    await pool.query("UPDATE customers SET tier = 'executive' WHERE user_id = $1", [res.body.user.id]);
+  }
   const login = await request(app).post('/auth/login').send({ email, password: payload.password });
   return { userId: res.body.user.id, token: login.body.token };
 }

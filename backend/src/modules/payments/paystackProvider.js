@@ -89,6 +89,33 @@ async function verifyCharge(reference) {
 }
 
 /**
+ * Charges a saved card with Paystack's "Charge Authorization" endpoint (POST
+ * /transaction/charge_authorization) - the recurring-billing building block: no checkout page, the
+ * money is taken immediately. NOT YET VERIFIED against real credentials - same caveat as the rest
+ * of this file; confirm against Paystack's test mode before PAYSTACK_MODE is switched to 'paystack'.
+ */
+async function chargeAuthorization({ amountKobo, email, authorizationCode, reference, metadata }) {
+  const { secretKey, baseUrl } = config.payments.paystack;
+  if (!secretKey) {
+    throw new Error('PAYSTACK_SECRET_KEY is not set. Set PAYSTACK_MODE=mock until real credentials exist.');
+  }
+  const response = await fetch(`${baseUrl}/transaction/charge_authorization`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      amount: amountKobo,
+      email,
+      authorization_code: authorizationCode,
+      reference,
+      metadata,
+    }),
+  });
+  const body = await response.json();
+  const ok = response.ok && body.status && body.data && body.data.status === 'success';
+  return { provider: 'paystack', status: ok ? 'success' : 'failed', reference, raw: body };
+}
+
+/**
  * Verifies Paystack's `x-paystack-signature` webhook header: HMAC-SHA512 of the raw request
  * body, keyed with the secret key, per Paystack's documented webhook security scheme.
  * `rawBody` must be the exact bytes Paystack sent (a Buffer/string) - not a re-serialized JSON
@@ -283,6 +310,7 @@ async function initiateRefund({ amountKobo, reference, reason }) {
 module.exports = {
   initializeCharge,
   verifyCharge,
+  chargeAuthorization,
   verifyWebhookSignature,
   initiateTransfer,
   initiateRefund,

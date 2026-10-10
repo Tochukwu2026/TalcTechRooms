@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const createApp = require('../../src/app');
 const { pool } = require('../../src/db/pool');
+const { runRenewals } = require('../../src/modules/customers/renewalService');
 const { cleanDatabase, closeDatabase } = require('./testHelpers');
 
 const app = createApp();
@@ -33,6 +34,10 @@ async function registerCustomer(overrides = {}) {
       ...overrides,
     });
   assert.equal(res.status, 201);
+  if (overrides.tier === 'executive') {
+    // Registration never grants Executive by itself (it must be paid for) - promote directly for these tests.
+    await pool.query("UPDATE customers SET tier = 'executive' WHERE user_id = (SELECT id FROM users WHERE email = $1)", [email]);
+  }
   return login(email, overrides.password || PASSWORD);
 }
 
@@ -286,4 +291,166 @@ test('Password change needs the right current password and a different, long-eno
   await login('customer@example.com', 'brand-new-pass-1');
   const old = await request(app).post('/auth/login').send({ email: 'customer@example.com', password: PASSWORD });
   assert.equal(old.status, 401);
+});
+
+// ---------- Executive sign-up (payment required) ----------
+
+test('Signing up as Executive creates a Regular account and asks for payment; paying makes them Executive and saves the card', async () => {
+  const { token, user } = await registerCustomer({ email: 'newexec@example.com', tier: 'executive' });
+  // registerCustomer() above promotes executive requests directly for other tests - undo that to
+  // exercise the real flow, then check the registration response itself separately below.
+  await pool.query("UPDATE customers SET tier = 'regular' WHERE user_id = $1", [user.id]);
+
+  const reg = await request(app).post('/customers/register').send({
+    email: 'signup-exec@example.com',
+    phone: '08011112222',
+    fullName: 'Sign Up Exec',
+    password: PASSWORD,
+    tier: 'executive',
+    documentType: 'passport',
+    documentNumber: 'B1234569',
+  });
+  assert.equal(reg.status, 201);
+  assert.equal(reg.body.tier, 'regular', 'must not be Executive until the payment is confirmed');
+  assert.equal(reg.body.executivePaymentRequired, true);
+  const plain = await request(app).post('/customers/register').send({
+    email: 'signup-regular@example.com',
+    fullName: 'Plain Regular',
+    password: PASSWORD,
+    documentType: 'passport',
+    documentNumber: 'B1234569',
+  });
+  assert.equal(plain.body.executivePaymentRequired, false);
+
+  const session = await login('signup-exec@example.com', PASSWORD);
+  assert.equal(session.user.tier, 'regular');
+
+  const init = await request(app).post('/customers/me/executive-upgrade/initialize').set(auth(session.token));
+  assert.equal(init.status, 201);
+  const verify = await request(app)
+    .post(`/customers/me/executive-upgrade/verify/${init.body.reference}`)
+    .set(auth(session.token));
+  assert.equal(verify.status, 201);
+  assert.equal(verify.body.tier, 'executive');
+  assert.equal(verify.body.subscription.autoRenew, true);
+  assert.deepEqual(verify.body.subscription.card, { brand: 'visa', last4: '4081' });
+
+  const { rows } = await pool.query(
+    'SELECT paystack_authorization_code, card_reusable FROM executive_subscriptions WHERE customer_user_id = $1',
+    [session.user.id]
+  );
+  assert.ok(rows[0].paystack_authorization_code.startsWith('AUTH_'));
+  assert.equal(rows[0].card_reusable, true);
+  void token;
+});
+
+test('Abandoning the sign-up payment leaves a working Regular account', async () => {
+  await request(app).post('/customers/register').send({
+    email: 'abandon+fail@example.com',
+    fullName: 'Abandoner',
+    password: PASSWORD,
+    tier: 'executive',
+    documentType: 'passport',
+    documentNumber: 'B1234569',
+  });
+  const session = await login('abandon+fail@example.com', PASSWORD);
+  const init = await request(app).post('/customers/me/executive-upgrade/initialize').set(auth(session.token));
+  const verify = await request(app)
+    .post(`/customers/me/executive-upgrade/verify/${init.body.reference}`)
+    .set(auth(session.token));
+  assert.equal(verify.status, 402);
+  assert.equal(await tierOf(session.user.id), 'regular');
+});
+
+// ---------- Monthly auto-renewal ----------
+
+async function signUpAndPayExecutive(email) {
+  const reg = await request(app).post('/customers/register').send({
+    email,
+    fullName: 'Renewing Exec',
+    password: PASSWORD,
+    tier: 'executive',
+    documentType: 'passport',
+    documentNumber: 'B1234569',
+  });
+  assert.equal(reg.status, 201);
+  const session = await login(email, PASSWORD);
+  const init = await request(app).post('/customers/me/executive-upgrade/initialize').set(auth(session.token));
+  const verify = await request(app)
+    .post(`/customers/me/executive-upgrade/verify/${init.body.reference}`)
+    .set(auth(session.token));
+  assert.equal(verify.status, 201);
+  return session;
+}
+
+const inDays = (n) => new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+
+async function subs(userId) {
+  const { rows } = await pool.query(
+    'SELECT status, auto_renew, current_period_ends_at, paystack_charge_reference FROM executive_subscriptions WHERE customer_user_id = $1 ORDER BY id',
+    [userId]
+  );
+  return rows;
+}
+
+test('A paid month renews automatically on the saved card, once, and the next month starts where the last ended', async () => {
+  const { user } = await signUpAndPayExecutive('renew@example.com');
+
+  const early = await runRenewals({ now: inDays(10) });
+  assert.equal(early.checked, 0, 'nothing is due yet');
+
+  const first = await runRenewals({ now: inDays(32) });
+  assert.equal(first.renewed, 1);
+  const again = await runRenewals({ now: inDays(32) });
+  assert.equal(again.checked, 0, 'a second run must not charge the same month twice');
+
+  const rows = await subs(user.id);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].status, 'expired');
+  assert.equal(rows[1].status, 'active');
+  assert.ok(new Date(rows[1].current_period_ends_at) > new Date(rows[0].current_period_ends_at));
+  assert.equal(await tierOf(user.id), 'executive');
+});
+
+test('Switching auto-renewal off keeps Executive until the paid month ends, then drops to Regular without charging', async () => {
+  const { token, user } = await signUpAndPayExecutive('stop@example.com');
+
+  const off = await request(app).patch('/customers/me/subscription').set(auth(token)).send({ autoRenew: false });
+  assert.equal(off.status, 200);
+  assert.equal(off.body.autoRenew, false);
+  assert.equal(off.body.tier, 'executive');
+
+  const midMonth = await runRenewals({ now: inDays(10) });
+  assert.equal(midMonth.checked, 0);
+  assert.equal(await tierOf(user.id), 'executive');
+
+  const afterMonth = await runRenewals({ now: inDays(32) });
+  assert.equal(afterMonth.downgraded, 1);
+  assert.equal(await tierOf(user.id), 'regular');
+  assert.equal((await subs(user.id)).length, 1, 'no new charge was made');
+
+  const back = await request(app).patch('/customers/me/subscription').set(auth(token)).send({ autoRenew: true });
+  assert.equal(back.status, 409, 'no active subscription left to switch on');
+});
+
+test('A declined renewal drops the Customer to Regular', async () => {
+  const { user } = await signUpAndPayExecutive('late+renewfail@example.com');
+  const run = await runRenewals({ now: inDays(32) });
+  assert.equal(run.declined, 1);
+  assert.equal(await tierOf(user.id), 'regular');
+});
+
+test('The auto-renewal switch is for Executive Customers and shows in their profile', async () => {
+  const regular = await registerCustomer({ email: 'free@example.com' });
+  const res = await request(app).patch('/customers/me/subscription').set(auth(regular.token)).send({ autoRenew: false });
+  assert.equal(res.status, 409);
+
+  const { token } = await signUpAndPayExecutive('profile@example.com');
+  const me = await request(app).get('/customers/me').set(auth(token));
+  assert.equal(me.body.autoRenew, true);
+  assert.deepEqual(me.body.card, { brand: 'visa', last4: '4081' });
+  assert.ok(me.body.executivePeriodEndsAt);
+
+  const bad = await request(app).patch('/customers/me/subscription').set(auth(token)).send({ autoRenew: 'no' });
+  assert.equal(bad.status, 422);
 });

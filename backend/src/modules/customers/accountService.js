@@ -25,7 +25,7 @@ async function getProfile(userId) {
   const row = rows[0];
 
   const sub = await pool.query(
-    `SELECT current_period_ends_at
+    `SELECT current_period_ends_at, auto_renew, card_brand, card_last4
        FROM executive_subscriptions
       WHERE customer_user_id = $1 AND status = 'active'
       ORDER BY started_at DESC
@@ -40,7 +40,25 @@ async function getProfile(userId) {
     fullName: row.full_name,
     tier: row.tier,
     executivePeriodEndsAt: sub.rows[0]?.current_period_ends_at ?? null,
+    autoRenew: sub.rows[0] ? sub.rows[0].auto_renew : null,
+    card: sub.rows[0]?.card_last4 ? { brand: sub.rows[0].card_brand, last4: sub.rows[0].card_last4 } : null,
   };
+}
+
+/**
+ * Switches monthly auto-renewal on or off for the Customer's current Executive month. Off means
+ * they keep Executive until that month ends, then become Regular (done by the renewal job).
+ */
+async function setAutoRenew(userId, autoRenew) {
+  const { rowCount } = await pool.query(
+    `UPDATE executive_subscriptions SET auto_renew = $2
+      WHERE customer_user_id = $1 AND status = 'active'`,
+    [userId, autoRenew]
+  );
+  if (rowCount === 0) {
+    throw new ApiError(409, 'You do not have an active Executive subscription.');
+  }
+  return getProfile(userId);
 }
 
 async function assertCurrentPassword(userId, currentPassword) {
@@ -99,4 +117,4 @@ async function changePassword(userId, { currentPassword, newPassword }) {
   return { changed: true };
 }
 
-module.exports = { getProfile, updateProfile, changePassword };
+module.exports = { getProfile, updateProfile, changePassword, setAutoRenew };

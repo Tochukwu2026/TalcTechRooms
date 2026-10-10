@@ -32,6 +32,17 @@ async function verifyCharge(reference) {
   return provider().verifyCharge(reference);
 }
 
+/**
+ * Charges a card the Customer already used before (Paystack's reusable "authorization"), with no
+ * checkout page - how the Executive subscription renews each month. Resolves to the final result
+ * straight away: 'success' only if Paystack says the money was taken.
+ * @param {{amountKobo:number, email:string, authorizationCode:string, reference:string, metadata:object}} params
+ * @returns {Promise<{provider:string, status:'success'|'failed', reference:string, raw:object}>}
+ */
+async function chargeAuthorization({ amountKobo, email, authorizationCode, reference, metadata }) {
+  return provider().chargeAuthorization({ amountKobo, email, authorizationCode, reference, metadata });
+}
+
 /** A unique reference to hand Paystack for a new charge - not a booking id, since no booking
  * row exists yet at this point (a booking only exists after payment - see decisions log). */
 function generateReference(prefix = 'ttr') {
@@ -77,6 +88,7 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 module.exports = {
   initializeCharge,
   verifyCharge,
+  chargeAuthorization,
   generateReference,
   verifyWebhookSignature,
   initiateTransfer,

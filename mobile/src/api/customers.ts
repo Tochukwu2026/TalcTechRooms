@@ -33,3 +33,9 @@ export function verifyExecutiveUpgrade(reference: string): Promise<VerifyUpgrade
     method: 'POST',
   });
 }
+
+// Switches monthly Executive auto-renewal on or off. Off = keep Executive until the paid month ends,
+// then become Regular.
+export function setAutoRenew(autoRenew: boolean): Promise<CustomerProfile> {
+  return apiRequest<CustomerProfile>('/customers/me/subscription', { method: 'PATCH', body: { autoRenew } });
+}

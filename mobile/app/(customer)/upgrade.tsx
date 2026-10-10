@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { getExecutiveSubscriptionPreview } from '@/api/auth';
@@ -17,6 +17,9 @@ import { formatNaira } from '@/utils/format';
 export default function UpgradeScreen() {
   const insets = useSafeAreaInsets();
   const { updateUser } = useAuth();
+  // Set when this screen is opened straight from sign-up (chose Executive while registering).
+  const { signup } = useLocalSearchParams<{ signup?: string }>();
+  const isSignup = signup === '1';
 
   const [preview, setPreview] = useState<ExecutiveSubscriptionPreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(true);
@@ -132,15 +135,18 @@ export default function UpgradeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>{'‹ Back'}</Text>
-      </Pressable>
+      {isSignup ? null : (
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>{'‹ Back'}</Text>
+        </Pressable>
+      )}
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Upgrade to Executive</Text>
+        <Text style={styles.title}>{isSignup ? 'Complete your Executive sign-up' : 'Upgrade to Executive'}</Text>
         <Text style={styles.subtitle}>
-          Book Live and Video Viewings of accommodations before you pay. Your Executive access runs for 1 month from
-          payment.
+          Book Live and Video Viewings of accommodations before you pay. Your card is charged now for the first month,
+          then renews automatically every month. You can switch renewal off any time in Account - you then go back to a
+          Regular account when the paid month ends.
         </Text>
 
         <View style={styles.breakdown}>
@@ -160,6 +166,12 @@ export default function UpgradeScreen() {
             <Text style={styles.primaryButtonText}>Pay {formatNaira(preview.totalChargedNaira)}</Text>
           )}
         </Pressable>
+
+        {isSignup ? (
+          <Pressable style={styles.skipButton} onPress={() => router.replace('/(customer)/home')} disabled={isStartingPayment || isVerifying}>
+            <Text style={styles.skipButtonText}>Continue as Regular for now (free)</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <Modal visible={Boolean(checkoutUrl)} animationType="slide">
@@ -293,6 +305,15 @@ const styles = StyleSheet.create({
   },
   successButton: {
     alignSelf: 'stretch',
+  },
+  skipButton: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  skipButtonText: {
+    color: colors.accentDark,
+    fontSize: 14,
+    fontWeight: '600',
   },
   backLink: {
     marginTop: 16,

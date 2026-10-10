@@ -6,9 +6,14 @@
 // Nothing about the Customer changes until the charge actually succeeds - the tier only flips
 // inside finalizeUpgrade, after payments.verifyCharge says 'success'.
 //
-// NOT built yet (flagged to the founder 2026-10-06): monthly auto-renewal through Paystack's
-// recurring billing, and dropping the tier back to 'regular' when a period lapses unpaid. This
-// first version charges and records one month (current_period_ends_at = +1 month) and that is all.
+// Also used at sign-up: registering "as Executive" creates a Regular account and the app sends the
+// Customer straight into this same payment flow (see customerService.registerCustomer).
+//
+// The card used is saved (Paystack's reusable authorization token + brand + last 4 - never the card
+// number) so next month's charge can be taken without re-entering it.
+//
+// NOT built yet: the monthly renewal charge itself, and dropping the tier back to 'regular' when a
+// period lapses unpaid. This version charges and records one month (current_period_ends_at = +1 month).
 
 const { pool, withTransaction } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
@@ -68,6 +73,8 @@ function toSubscriptionResponse(row) {
     startedAt: row.started_at,
     currentPeriodEndsAt: row.current_period_ends_at,
     paystackChargeReference: row.paystack_charge_reference,
+    autoRenew: row.auto_renew,
+    card: row.card_last4 ? { brand: row.card_brand, last4: row.card_last4 } : null,
   };
 }
 
@@ -102,12 +109,16 @@ async function finalizeUpgrade(reference) {
     throw new ApiError(500, 'Charge amount does not match the quoted subscription price.');
   }
 
+  // The card Paystack just charged, saved for next month's renewal (token + brand + last 4 only).
+  const auth = verified.raw && verified.raw.authorization ? verified.raw.authorization : null;
+
   return withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO executive_subscriptions
          (customer_user_id, status, base_fee_naira, admin_costs_naira, vat_naira, total_charged_naira,
-          current_period_ends_at, paystack_charge_reference)
-       VALUES ($1, 'active', $2, $3, $4, $5, now() + interval '1 month', $6)
+          current_period_ends_at, paystack_charge_reference,
+          paystack_authorization_code, card_brand, card_last4, card_reusable)
+       VALUES ($1, 'active', $2, $3, $4, $5, now() + interval '1 month', $6, $7, $8, $9, $10)
        ON CONFLICT (paystack_charge_reference) WHERE paystack_charge_reference IS NOT NULL DO NOTHING
        RETURNING *`,
       [
@@ -117,6 +128,10 @@ async function finalizeUpgrade(reference) {
         meta.vatNaira,
         meta.totalChargedNaira,
         reference,
+        auth ? auth.authorization_code : null,
+        auth ? auth.brand : null,
+        auth ? auth.last4 : null,
+        auth ? Boolean(auth.reusable) : null,
       ]
     );
 

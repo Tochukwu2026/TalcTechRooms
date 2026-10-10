@@ -135,3 +135,15 @@ test('POST /internal/evaluate-payouts with the correct secret runs the real eval
   assert.equal(caseRows.length, 1);
   assert.equal(caseRows[0].reason, 'no_show_no_response');
 });
+
+test('POST /internal/renew-subscriptions needs the scheduler secret, and runs with it', async () => {
+  const anon = await request(app).post('/internal/renew-subscriptions').send();
+  assert.equal(anon.status, 401);
+
+  const res = await request(app)
+    .post('/internal/renew-subscriptions')
+    .set('X-Scheduler-Secret', 'test-scheduler-secret-abc123')
+    .send();
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(res.body.checked, 0);
+});

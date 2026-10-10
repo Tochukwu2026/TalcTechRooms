@@ -58,7 +58,34 @@ async function verifyCharge(reference) {
     amountKobo: charge.amountKobo,
     paidAt: charge.paidAt,
     metadata: charge.metadata,
-    raw: { note: 'mock provider - no real API call made', ...charge },
+    raw: {
+      note: 'mock provider - no real API call made',
+      ...charge,
+      // Same shape as the `authorization` block Paystack returns on a successful card charge.
+      authorization:
+        charge.status === 'success'
+          ? { authorization_code: `AUTH_mock_${reference}`, brand: 'visa', last4: '4081', reusable: true }
+          : null,
+    },
+  };
+}
+
+// Renewal charge on a saved card. An email containing "+renewfail" right before the @ simulates a
+// declined renewal (card expired / insufficient funds); everything else succeeds.
+async function chargeAuthorization({ amountKobo, email, authorizationCode, reference, metadata }) {
+  const willFail = /\+renewfail@/i.test(email || '');
+  charges.set(reference, {
+    amountKobo,
+    email,
+    metadata,
+    status: willFail ? 'failed' : 'success',
+    paidAt: willFail ? null : new Date().toISOString(),
+  });
+  return {
+    provider: 'mock',
+    status: willFail ? 'failed' : 'success',
+    reference,
+    raw: { note: 'mock provider - no real API call made', authorizationCode },
   };
 }
 
@@ -109,4 +136,4 @@ async function initiateRefund({ amountKobo, reference }) {
   };
 }
 
-module.exports = { initializeCharge, verifyCharge, initiateTransfer, initiateRefund };
+module.exports = { initializeCharge, verifyCharge, chargeAuthorization, initiateTransfer, initiateRefund };

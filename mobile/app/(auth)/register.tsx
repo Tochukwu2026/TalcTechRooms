@@ -92,7 +92,7 @@ export default function RegisterScreen() {
         }
         router.replace('/(renter)/dashboard');
       } else {
-        const { idVerificationPassed } = await registerAndSignIn({
+        const { idVerificationPassed, executivePaymentRequired } = await registerAndSignIn({
           email: email.trim(),
           phone: phone.trim() || undefined,
           fullName: fullName.trim(),
@@ -107,7 +107,13 @@ export default function RegisterScreen() {
               'may be restricted until this is resolved.'
           );
         }
-        router.replace('/(customer)/home');
+        // Executive is paid for at sign-up: straight into the payment screen. The account already
+        // exists as Regular, so abandoning the payment still leaves a working free account.
+        if (executivePaymentRequired && idVerificationPassed) {
+          router.replace({ pathname: '/(customer)/upgrade', params: { signup: '1' } });
+        } else {
+          router.replace('/(customer)/home');
+        }
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
@@ -209,9 +215,9 @@ export default function RegisterScreen() {
             </View>
             <Text style={styles.hint}>
               {tier === 'executive'
-                ? `Executive adds Live and Video Viewing bookings before you stay${
-                    executivePriceNaira ? ` (currently ${formatNaira(executivePriceNaira)}/month once billing is live)` : ''
-                  }. No charge for this yet - subscription billing isn't wired up.`
+                ? `Executive adds Live and Video Viewing bookings before you stay. You pay${
+                    executivePriceNaira ? ` ${formatNaira(executivePriceNaira)}` : ''
+                  } for the first month right after creating your account, and your card is saved so it renews every month. You can switch renewal off any time in Account.`
                 : 'Regular Customers can search and book stays. Switch to Executive above to also unlock Live/Video Viewing bookings.'}
             </Text>
           </>

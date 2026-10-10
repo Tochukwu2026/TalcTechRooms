@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
+  Switch,
   ActivityIndicator,
   Pressable,
   ScrollView,
@@ -10,7 +11,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { changeMyPassword, getMyProfile, updateMyProfile } from '@/api/customers';
+import { changeMyPassword, getMyProfile, setAutoRenew, updateMyProfile } from '@/api/customers';
 import type { CustomerProfile } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -43,6 +44,8 @@ export default function AccountScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isSavingRenewal, setIsSavingRenewal] = useState(false);
+  const [renewalError, setRenewalError] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   function applyProfile(next: CustomerProfile) {
@@ -159,6 +162,18 @@ export default function AccountScreen() {
 
   const periodEnds = formatDate(profile?.executivePeriodEndsAt ?? null);
 
+  async function toggleAutoRenew(value: boolean) {
+    setRenewalError(null);
+    setIsSavingRenewal(true);
+    try {
+      setProfile(await setAutoRenew(value));
+    } catch (err) {
+      setRenewalError(err instanceof ApiError ? err.message : 'Could not change auto-renewal. Please try again.');
+    } finally {
+      setIsSavingRenewal(false);
+    }
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -179,10 +194,31 @@ export default function AccountScreen() {
                 {profile.tier === 'executive' ? 'Executive Customer' : 'Regular Customer'}
               </Text>
               {profile.tier === 'executive' ? (
+                <>
                 <Text style={styles.cardText}>
                   You can book Live and Video Viewings of accommodations.
-                  {periodEnds ? ` Your current period runs until ${periodEnds}.` : ''}
+                  {periodEnds ? ` Your current paid month runs until ${periodEnds}.` : ''}
                 </Text>
+                {profile.autoRenew !== null ? (
+                  <View style={styles.renewRow}>
+                    <View style={styles.renewTextWrap}>
+                      <Text style={styles.renewTitle}>Renew automatically every month</Text>
+                      <Text style={styles.renewHint}>
+                        {profile.autoRenew
+                          ? `${profile.card ? `Charged to your card ending ${profile.card.last4}. ` : ''}Renews on ${periodEnds ?? 'the end of this month'}.`
+                          : `Renewal is off. You'll become a Regular Customer on ${periodEnds ?? 'the end of this month'}.`}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={profile.autoRenew}
+                      onValueChange={toggleAutoRenew}
+                      disabled={isSavingRenewal}
+                      trackColor={{ false: colors.border, true: colors.accent }}
+                    />
+                  </View>
+                ) : null}
+                {renewalError ? <Text style={styles.error}>{renewalError}</Text> : null}
+                </>
               ) : (
                 <>
                   <Text style={styles.cardText}>
@@ -366,6 +402,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginTop: 4,
+  },
+  renewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  renewTextWrap: {
+    flex: 1,
+  },
+  renewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  renewHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   cardText: {
     fontSize: 14,

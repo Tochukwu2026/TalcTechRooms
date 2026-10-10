@@ -4,7 +4,7 @@ const { verifyIdentity } = require('../idVerification');
 const ApiError = require('../../utils/ApiError');
 
 /**
- * Registers a Customer. Unlike Renters, Customers get instant/automatic access once ID
+ * Registers a Customer (always as Regular - see wantsExecutive below). Unlike Renters, Customers get instant/automatic access once ID
  * validation passes - no manual review queue. If verification fails, the account still
  * exists (so the person isn't locked out of retrying), but the caller should treat a
  * 'failed' idVerification.status in the response as "not yet allowed to book" and prompt
@@ -12,7 +12,12 @@ const ApiError = require('../../utils/ApiError');
  */
 async function registerCustomer({ email, phone, fullName, password, gender, tier, documentType, documentNumber }) {
   const passwordHash = await hashPassword(password);
-  const resolvedTier = tier === 'executive' ? 'executive' : 'regular';
+  // Executive is a paid tier: signing up "as Executive" creates the account as Regular and tells
+  // the app to take the first month's payment straight away (executivePaymentRequired). The tier
+  // only flips to 'executive' once that charge is confirmed - see executiveUpgradeService. Nobody
+  // gets Executive for free just by asking for it at registration.
+  const wantsExecutive = tier === 'executive';
+  const resolvedTier = 'regular';
 
   return withTransaction(async (client) => {
     const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
@@ -56,6 +61,7 @@ async function registerCustomer({ email, phone, fullName, password, gender, tier
     return {
       user,
       tier: resolvedTier,
+      executivePaymentRequired: wantsExecutive,
       active: verification.status === 'verified',
       idVerification: verificationResult.rows[0],
     };

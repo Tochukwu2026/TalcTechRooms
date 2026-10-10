@@ -31,6 +31,8 @@ export interface RegisterCustomerResponse {
     created_at: string;
   };
   tier: 'regular' | 'executive';
+  // True when the person chose Executive at sign-up: the app must take the first payment next.
+  executivePaymentRequired: boolean;
   active: boolean;
   idVerification: {
     id: string | number;
@@ -288,6 +290,9 @@ export interface CustomerProfile {
   tier: 'regular' | 'executive';
   // End of the paid Executive month, or null for a Regular Customer.
   executivePeriodEndsAt: string | null;
+  // Monthly Executive auto-renewal switch and the saved card; null for a Regular Customer.
+  autoRenew: boolean | null;
+  card: { brand: string | null; last4: string } | null;
 }
 
 // POST /customers/me/executive-upgrade/initialize - see backend executiveUpgradeService.js.
@@ -304,5 +309,7 @@ export interface VerifyUpgradeResponse {
   subscription: {
     totalChargedNaira: number;
     currentPeriodEndsAt: string | null;
+    autoRenew?: boolean;
+    card?: { brand: string | null; last4: string } | null;
   };
 }

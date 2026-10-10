@@ -11,6 +11,7 @@ const {
   customerRegisterSchema,
   updateCustomerProfileSchema,
   changePasswordSchema,
+  autoRenewSchema,
   validateBody,
 } = require('./validation');
 
@@ -62,6 +63,18 @@ router.post(
   validateBody(changePasswordSchema),
   asyncHandler(async (req, res) => {
     res.json(await accountService.changePassword(req.user.id, req.body));
+  })
+);
+
+// Turn monthly Executive auto-renewal on/off. Off = keep Executive until the paid month ends, then
+// become Regular (see modules/customers/renewalService.js).
+router.patch(
+  '/me/subscription',
+  authenticate,
+  requireRole('customer'),
+  validateBody(autoRenewSchema),
+  asyncHandler(async (req, res) => {
+    res.json(await accountService.setAutoRenew(req.user.id, req.body.autoRenew));
   })
 );
 
