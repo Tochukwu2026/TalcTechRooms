@@ -17,7 +17,7 @@ const crypto = require('crypto');
 const config = require('../../config');
 const { resolveBankCode } = require('./nigerianBanks');
 
-async function initializeCharge({ amountKobo, email, reference, metadata }) {
+async function initializeCharge({ amountKobo, email, reference, metadata, channels }) {
   const { secretKey, baseUrl } = config.payments.paystack;
   if (!secretKey) {
     throw new Error(
@@ -32,7 +32,13 @@ async function initializeCharge({ amountKobo, email, reference, metadata }) {
       Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ amount: amountKobo, email, reference, metadata }),
+    body: JSON.stringify({
+      amount: amountKobo,
+      email,
+      reference,
+      metadata,
+      ...(channels && channels.length ? { channels } : {}),
+    }),
   });
   const body = await response.json();
 

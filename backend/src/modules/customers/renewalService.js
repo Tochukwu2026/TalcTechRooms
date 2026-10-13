@@ -9,8 +9,8 @@
 // A renewal's price is the CURRENT admin_settings Executive price (same as a new sign-up), locked
 // into that period's row.
 //
-// ASSUMPTION (not yet confirmed with the founder): if the renewal charge is declined, the Customer
-// drops back to Regular straight away - there is no grace period or retry yet.
+// Founder's decision (2026-10-10): if the renewal charge is declined, the Customer drops back to
+// Regular straight away - no grace period and no retry.
 
 const { pool, withTransaction } = require('../../db/pool');
 const payments = require('../payments');

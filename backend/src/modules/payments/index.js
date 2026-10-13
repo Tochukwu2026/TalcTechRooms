@@ -15,10 +15,11 @@ function provider() {
  * Starts a charge for a booking (or the Executive subscription). Returns an
  * authorizationUrl the client redirects the Customer to (Paystack's hosted checkout page in
  * real mode; a fake local URL in mock mode, since there's no real page to redirect to yet).
- * @param {{amountKobo:number, email:string, reference:string, metadata:object}} params
+ * `channels` (optional, e.g. ['card']) limits which payment methods Paystack's checkout offers.
+ * @param {{amountKobo:number, email:string, reference:string, metadata:object, channels?:string[]}} params
  */
-async function initializeCharge({ amountKobo, email, reference, metadata }) {
-  return provider().initializeCharge({ amountKobo, email, reference, metadata });
+async function initializeCharge({ amountKobo, email, reference, metadata, channels }) {
+  return provider().initializeCharge({ amountKobo, email, reference, metadata, channels });
 }
 
 /**

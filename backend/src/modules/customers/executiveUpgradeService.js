@@ -52,6 +52,8 @@ async function initializeUpgrade(customerUserId, customerEmail) {
     email: customerEmail,
     reference,
     metadata,
+    // Card only: bank transfer/USSD can't be saved for the monthly auto-renewal.
+    channels: ['card'],
   });
 
   return {
