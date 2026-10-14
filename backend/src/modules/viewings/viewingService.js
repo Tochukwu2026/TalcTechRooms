@@ -22,6 +22,7 @@
 const { pool, withTransaction } = require('../../db/pool');
 const ApiError = require('../../utils/ApiError');
 const notifications = require('../notifications');
+const { assertViewingsOfferedFor } = require('./viewingRestrictions');
 
 const VIDEO_WINDOW_DAYS = 30; // "Shows availability for the next 30 days for that listing."
 const VIDEO_WEEKLY_LIMIT_DAYS = 7; // "1 Video Viewing per location per week" - measured from the
@@ -78,6 +79,7 @@ async function assertAccommodationActive(client, accommodationId) {
 async function getVideoAvailability(accommodationId, customerUserId) {
   await assertExecutiveCustomer(pool, customerUserId);
   await assertAccommodationActive(pool, accommodationId);
+  await assertViewingsOfferedFor(pool, accommodationId);
 
   const start = todayIso();
   const dates = [];
@@ -94,6 +96,7 @@ async function getVideoAvailability(accommodationId, customerUserId) {
 async function getLiveAvailability(accommodationId, customerUserId) {
   await assertExecutiveCustomer(pool, customerUserId);
   await assertAccommodationActive(pool, accommodationId);
+  await assertViewingsOfferedFor(pool, accommodationId);
 
   const { rows } = await pool.query(
     `SELECT available_date FROM viewing_availability
@@ -171,6 +174,7 @@ async function bookViewing(customerUserId, accommodationId, { viewingType, sched
   const viewing = await withTransaction(async (client) => {
     await assertExecutiveCustomer(client, customerUserId);
     await assertAccommodationActive(client, accommodationId);
+    await assertViewingsOfferedFor(client, accommodationId);
 
     if (viewingType === 'video') {
       const maxDate = addDaysIso(todayIso(), VIDEO_WINDOW_DAYS - 1);

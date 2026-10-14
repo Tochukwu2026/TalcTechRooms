@@ -24,6 +24,9 @@ export default function Layout() {
           <NavLink to="/viewings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Viewing Assignments
           </NavLink>
+          <NavLink to="/viewing-limits" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Executive Viewing Limits
+          </NavLink>
           <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Business Settings
           </NavLink>

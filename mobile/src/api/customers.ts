@@ -22,8 +22,13 @@ export function changeMyPassword(currentPassword: string, newPassword: string): 
   });
 }
 
-export function initializeExecutiveUpgrade(): Promise<InitializeUpgradeResponse> {
-  return apiRequest<InitializeUpgradeResponse>('/customers/me/executive-upgrade/initialize', { method: 'POST' });
+// acknowledgedViewingRestrictions: the Customer ticked the "viewings not available in these states"
+// box (only required by the backend while at least one state is restricted).
+export function initializeExecutiveUpgrade(acknowledgedViewingRestrictions = false): Promise<InitializeUpgradeResponse> {
+  return apiRequest<InitializeUpgradeResponse>('/customers/me/executive-upgrade/initialize', {
+    method: 'POST',
+    body: { acknowledgedViewingRestrictions },
+  });
 }
 
 // Called after the Paystack checkout WebView closes - safe to call more than once (the backend

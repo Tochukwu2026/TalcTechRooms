@@ -61,6 +61,11 @@ export function listPriceCaps(): Promise<PriceCap[]> {
   return apiRequest<PriceCap[]>('/accommodations/price-caps', { auth: false });
 }
 
+// States where Executive viewings are switched off by the Admin (no staff there). Public.
+export function listViewingRestrictions(): Promise<{ restrictedStates: string[] }> {
+  return apiRequest<{ restrictedStates: string[] }>('/accommodations/viewing-restrictions', { auth: false });
+}
+
 export function listAmenities(): Promise<Amenity[]> {
   return apiRequest<Amenity[]>('/accommodations/amenities', { auth: false });
 }

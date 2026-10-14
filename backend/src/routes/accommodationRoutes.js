@@ -20,6 +20,7 @@ const accommodationService = require('../modules/accommodations/accommodationSer
 const checkoutService = require('../modules/checkout/checkoutService');
 const bookingService = require('../modules/booking/bookingService');
 const viewingService = require('../modules/viewings/viewingService');
+const viewingRestrictions = require('../modules/viewings/viewingRestrictions');
 
 const router = Router();
 
@@ -29,6 +30,13 @@ router.get(
   '/price-caps',
   asyncHandler(async (req, res) => {
     res.json(await accommodationService.listPriceCaps());
+  })
+);
+
+router.get(
+  '/viewing-restrictions',
+  asyncHandler(async (req, res) => {
+    res.json({ restrictedStates: await viewingRestrictions.listRestrictedStates() });
   })
 );
 

@@ -271,3 +271,6 @@ module.exports = {
   validateBody,
   validateQuery,
 };
+
+const setViewingRestrictionSchema = z.object({ restricted: z.boolean() });
+module.exports.setViewingRestrictionSchema = setViewingRestrictionSchema;

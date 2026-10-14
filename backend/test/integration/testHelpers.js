@@ -2,6 +2,7 @@ const { pool } = require('../../src/db/pool');
 
 // Order matters: children before parents (FK constraints).
 const TABLES_TO_CLEAN = [
+  'viewing_restricted_states',
   'notifications_log',
   'viewing_bookings',
   'refunds',
@@ -13,6 +14,7 @@ const TABLES_TO_CLEAN = [
   'accommodations',
   'executive_subscriptions',
   'id_verifications',
+  'viewing_restriction_acknowledgements',
   'customers',
   'renters',
   'users',

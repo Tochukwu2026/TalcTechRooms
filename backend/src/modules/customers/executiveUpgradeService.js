@@ -21,8 +21,9 @@ const payments = require('../payments');
 const checkoutService = require('../checkout/checkoutService');
 const { toKobo } = require('../checkout/checkoutMath');
 const { assertCustomerIdVerified } = require('../booking/bookingService');
+const viewingRestrictions = require('../viewings/viewingRestrictions');
 
-async function initializeUpgrade(customerUserId, customerEmail) {
+async function initializeUpgrade(customerUserId, customerEmail, { acknowledgedViewingRestrictions = false } = {}) {
   const { rows } = await pool.query('SELECT tier FROM customers WHERE user_id = $1', [customerUserId]);
   if (rows.length === 0) {
     throw new ApiError(404, 'Customer account not found.');
@@ -32,6 +33,22 @@ async function initializeUpgrade(customerUserId, customerEmail) {
   }
 
   await assertCustomerIdVerified(customerUserId);
+
+  // If any state currently has Executive viewings switched off, the Customer must have accepted
+  // that notice before paying - enforced here (not just in the app) and recorded for legal purposes.
+  const restrictedStates = await viewingRestrictions.listRestrictedStates();
+  if (restrictedStates.length > 0) {
+    if (!acknowledgedViewingRestrictions) {
+      throw new ApiError(
+        400,
+        `Please confirm you understand Executive viewings are not yet available in: ${restrictedStates.join(', ')}.`
+      );
+    }
+    await pool.query(
+      'INSERT INTO viewing_restriction_acknowledgements (customer_user_id, restricted_states) VALUES ($1, $2)',
+      [customerUserId, restrictedStates]
+    );
+  }
 
   // Priced at the CURRENT admin_settings rates and locked into the charge's metadata, same as a
   // booking - so what the Customer saw is what they are charged and what gets recorded.

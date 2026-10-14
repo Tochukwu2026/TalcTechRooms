@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS viewing_restriction_acknowledgements;

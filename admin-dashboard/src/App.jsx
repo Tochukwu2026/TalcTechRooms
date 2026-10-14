@@ -8,6 +8,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import ReviewCasesPage from './pages/ReviewCasesPage.jsx';
 import ViewingsPage from './pages/ViewingsPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
+import ViewingRestrictionsPage from './pages/ViewingRestrictionsPage.jsx';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/price-caps" element={<PriceCapsPage />} />
           <Route path="/review-cases" element={<ReviewCasesPage />} />
           <Route path="/viewings" element={<ViewingsPage />} />
+          <Route path="/viewing-limits" element={<ViewingRestrictionsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/users" element={<UsersPage />} />
         </Route>

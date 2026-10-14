@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getAccommodation, getAvailability } from '@/api/accommodations';
+import { getAccommodation, getAvailability, listViewingRestrictions } from '@/api/accommodations';
 import type { AvailabilityResponse, PublicAccommodation } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -27,6 +27,7 @@ export default function ListingDetailScreen() {
   const [listing, setListing] = useState<PublicAccommodation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [restrictedStates, setRestrictedStates] = useState<string[]>([]);
 
   const [checkIn, setCheckIn] = useState(params.checkIn ?? '');
   const [checkOut, setCheckOut] = useState(params.checkOut ?? '');
@@ -49,6 +50,16 @@ export default function ListingDetailScreen() {
       }
     })();
   }, [params.id]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setRestrictedStates((await listViewingRestrictions()).restrictedStates);
+      } catch {
+        // If this can't load, show the button as usual - the backend still refuses a restricted booking.
+      }
+    })();
+  }, []);
 
   const checkAvailability = useCallback(async () => {
     setAvailabilityError(null);
@@ -129,7 +140,11 @@ export default function ListingDetailScreen() {
         <Text style={styles.sectionTitle}>Description</Text>
         <Text style={styles.description}>{listing.description}</Text>
 
-        {user?.tier === 'executive' ? (
+        {user?.tier === 'executive' && restrictedStates.includes(listing.state) ? (
+          <Text style={styles.viewingUnavailable}>
+            Executive viewings aren't available in {listing.state} yet. You can still book and rent this place as normal.
+          </Text>
+        ) : user?.tier === 'executive' ? (
           <Pressable
             style={styles.viewingButton}
             onPress={() =>
@@ -306,6 +321,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 18,
     backgroundColor: colors.surface,
+  },
+  viewingUnavailable: {
+    marginTop: 18,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.textMuted,
+    fontSize: 13,
   },
   viewingButtonText: {
     color: colors.accentDark,

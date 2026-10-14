@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { getExecutiveSubscriptionPreview } from '@/api/auth';
+import { listViewingRestrictions } from '@/api/accommodations';
 import { initializeExecutiveUpgrade, verifyExecutiveUpgrade } from '@/api/customers';
 import type { ExecutiveSubscriptionPreview } from '@/api/types';
 import { ApiError } from '@/api/client';
@@ -34,6 +35,15 @@ export default function UpgradeScreen() {
 
   // Stops the WebView-close handler and an "I've Paid" tap both verifying the same payment at once.
   const isVerifyingRef = useRef(false);
+  const [restrictedStates, setRestrictedStates] = useState<string[]>([]);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const needsAcknowledgement = restrictedStates.length > 0 && !acknowledged;
+
+  useEffect(() => {
+    listViewingRestrictions()
+      .then((r) => setRestrictedStates(r.restrictedStates))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -51,7 +61,7 @@ export default function UpgradeScreen() {
     setPaymentError(null);
     setIsStartingPayment(true);
     try {
-      const result = await initializeExecutiveUpgrade();
+      const result = await initializeExecutiveUpgrade(acknowledged);
       setReference(result.reference);
 
       // In the backend's mock payment mode, authorizationUrl is a fake placeholder with no real
@@ -148,6 +158,17 @@ export default function UpgradeScreen() {
           then renews automatically every month. You can switch renewal off any time in Account - you then go back to a
           Regular account when the paid month ends.
         </Text>
+        {restrictedStates.length > 0 ? (
+          <Pressable style={styles.ackBox} onPress={() => setAcknowledged((v) => !v)}>
+            <View style={[styles.ackCheck, acknowledged && styles.ackCheckOn]}>
+              {acknowledged ? <Text style={styles.ackTick}>✓</Text> : null}
+            </View>
+            <Text style={styles.ackText}>
+              I understand that Executive viewings (Live and Video) are not yet available for listings in{' '}
+              {restrictedStates.join(', ')}. I can still book and rent in those states as normal.
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.breakdown}>
           <Row label="Executive subscription (1 month)" value={formatNaira(preview.baseFeeNaira)} />
@@ -159,7 +180,11 @@ export default function UpgradeScreen() {
 
         {paymentError ? <Text style={styles.error}>{paymentError}</Text> : null}
 
-        <Pressable style={styles.primaryButton} onPress={startPayment} disabled={isStartingPayment || isVerifying}>
+        <Pressable
+          style={[styles.primaryButton, needsAcknowledgement && { opacity: 0.45 }]}
+          onPress={startPayment}
+          disabled={isStartingPayment || isVerifying || needsAcknowledgement}
+        >
           {isStartingPayment || isVerifying ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -200,6 +225,29 @@ function Row({ label, value, emphasize }: { label: string; value: string; emphas
 }
 
 const styles = StyleSheet.create({
+  ackBox: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 12,
+    marginBottom: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  ackCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  ackCheckOn: { backgroundColor: colors.accent },
+  ackTick: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  ackText: { flex: 1, color: colors.text, fontSize: 13, lineHeight: 18 },
   container: {
     flex: 1,
     backgroundColor: colors.background,

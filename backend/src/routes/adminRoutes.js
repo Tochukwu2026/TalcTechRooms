@@ -18,6 +18,7 @@ const {
 } = require('../modules/admin/adminService');
 const payoutService = require('../modules/payout/payoutService');
 const viewingService = require('../modules/viewings/viewingService');
+const viewingRestrictions = require('../modules/viewings/viewingRestrictions');
 const {
   validateBody,
   updatePriceCapSchema,
@@ -25,6 +26,7 @@ const {
   updateSettingSchema,
   resolveReviewCaseSchema,
   assignStaffSchema,
+  setViewingRestrictionSchema,
 } = require('./validation');
 
 const router = Router();
@@ -181,6 +183,28 @@ router.patch(
   asyncHandler(async (req, res) => {
     const result = await reactivateUser(Number(req.params.id));
     res.json(result);
+  })
+);
+
+// Executive viewings on/off per state (no staff on the ground there) - see viewingRestrictions.js.
+router.get(
+  '/viewing-restrictions',
+  asyncHandler(async (req, res) => {
+    res.json(await viewingRestrictions.listStatesWithStatus());
+  })
+);
+
+router.put(
+  '/viewing-restrictions/:state',
+  validateBody(setViewingRestrictionSchema),
+  asyncHandler(async (req, res) => {
+    res.json(
+      await viewingRestrictions.setRestriction({
+        state: req.params.state,
+        restricted: req.body.restricted,
+        adminUserId: req.user.id,
+      })
+    );
   })
 );
 

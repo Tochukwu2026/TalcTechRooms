@@ -85,7 +85,9 @@ router.post(
   authenticate,
   requireRole('customer'),
   asyncHandler(async (req, res) => {
-    res.status(201).json(await executiveUpgradeService.initializeUpgrade(req.user.id, req.user.email));
+    res.status(201).json(await executiveUpgradeService.initializeUpgrade(req.user.id, req.user.email, {
+        acknowledgedViewingRestrictions: req.body?.acknowledgedViewingRestrictions === true,
+      }));
   })
 );
 
