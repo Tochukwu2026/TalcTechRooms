@@ -34,3 +34,13 @@ export function registerCustomer(input: RegisterCustomerInput): Promise<Register
 export function getExecutiveSubscriptionPreview(): Promise<ExecutiveSubscriptionPreview> {
   return apiRequest<ExecutiveSubscriptionPreview>('/customers/executive-subscription-cost', { auth: false });
 }
+
+// Permanently closes the signed-in Customer's or Renter's account (personal details are wiped; money
+// records are kept without a name). Needs the account password. The server refuses (409) while
+// a stay, viewing or payout is still open - the message says which.
+export function deleteMyAccount(password: string): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>('/auth/delete-account', {
+    method: 'POST',
+    body: { password },
+  });
+}

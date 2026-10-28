@@ -115,7 +115,7 @@ export default function UpgradeScreen() {
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
         <Text style={styles.successTitle}>You're an Executive Customer</Text>
         <Text style={styles.successText}>
-          You can now book Live and Video Viewings from any accommodation page.
+          You can now book staff-led viewings from any accommodation page, in the states where we have staff.
         </Text>
         <Pressable style={[styles.primaryButton, styles.successButton]} onPress={() => router.replace('/(customer)/home')}>
           <Text style={styles.primaryButtonText}>Done</Text>
@@ -154,7 +154,7 @@ export default function UpgradeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{isSignup ? 'Complete your Executive sign-up' : 'Upgrade to Executive'}</Text>
         <Text style={styles.subtitle}>
-          Book Live and Video Viewings of accommodations before you pay. Your card is charged now for the first month,
+          Executive is a membership for staff-led viewings: a TalcTech staff member visits a place for you and shows it to you, in person (Live) or by video (Video), before you pay for a stay. Your card is charged now for the first month,
           then renews automatically every month. You can switch renewal off any time in Account - you then go back to a
           Regular account when the paid month ends.
         </Text>

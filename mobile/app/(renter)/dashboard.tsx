@@ -110,6 +110,11 @@ export default function RenterDashboardScreen() {
             </View>
           </Pressable>
         )}
+        ListFooterComponent={
+          <Pressable style={styles.deleteLink} onPress={() => router.push('/delete-account')}>
+            <Text style={styles.deleteLinkText}>Delete my account</Text>
+          </Pressable>
+        }
         ListEmptyComponent={
           <Text style={styles.emptyText}>
             {renter?.approval_status === 'approved'
@@ -177,6 +182,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  deleteLink: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  deleteLinkText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
   logout: {
     color: colors.danger,

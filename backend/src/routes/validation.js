@@ -38,6 +38,8 @@ const changePasswordSchema = z.object({
 
 const autoRenewSchema = z.object({ autoRenew: z.boolean() });
 
+const deleteAccountSchema = z.object({ password: z.string().min(1) });
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -249,6 +251,7 @@ module.exports = {
   updateCustomerProfileSchema,
   changePasswordSchema,
   autoRenewSchema,
+  deleteAccountSchema,
   loginSchema,
   createAccommodationSchema,
   updateAccommodationSchema,

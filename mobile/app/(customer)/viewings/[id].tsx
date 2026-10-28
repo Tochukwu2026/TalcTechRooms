@@ -156,8 +156,8 @@ export default function BookViewingScreen() {
 
         <Text style={styles.hint}>
           {viewingType === 'video'
-            ? 'A video call walkthrough of the listing, any time in the next 30 days. Limited to one per listing every 7 days.'
-            : 'An in-person walkthrough, only on dates the Renter has made available. Limited to one per listing and three total per month.'}
+            ? 'A TalcTech staff member shows you the place live on a video call, any time in the next 30 days. Subject to staff availability. Limited to one per listing every 7 days.'
+            : 'A TalcTech staff member visits the place in person for you, only on dates the Renter has made available. Subject to staff availability. Limited to one per listing and three total per month.'}
         </Text>
 
         {isLoadingDates ? (

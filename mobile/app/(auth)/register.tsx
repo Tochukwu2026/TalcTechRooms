@@ -215,10 +215,10 @@ export default function RegisterScreen() {
             </View>
             <Text style={styles.hint}>
               {tier === 'executive'
-                ? `Executive adds Live and Video Viewing bookings before you stay. You pay${
+                ? `Executive is a monthly membership for staff-led viewings: a TalcTech staff member visits a place for you and shows it to you in person or by video, before you pay for a stay. You pay${
                     executivePriceNaira ? ` ${formatNaira(executivePriceNaira)}` : ''
                   } for the first month right after creating your account, and your card is saved so it renews every month. You can switch renewal off any time in Account.`
-                : 'Regular Customers can search and book stays. Switch to Executive above to also unlock Live/Video Viewing bookings.'}
+                : 'Regular Customers can search and book stays. Switch to Executive above to also get staff-led viewings of places before you pay.'}
             </Text>
           </>
         ) : null}

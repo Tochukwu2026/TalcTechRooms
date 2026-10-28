@@ -196,7 +196,7 @@ export default function AccountScreen() {
               {profile.tier === 'executive' ? (
                 <>
                 <Text style={styles.cardText}>
-                  You can book Live and Video Viewings of accommodations.
+                  You can book staff-led viewings: a TalcTech staff member visits a place and shows it to you in person or by video.
                   {periodEnds ? ` Your current paid month runs until ${periodEnds}.` : ''}
                 </Text>
                 {profile.autoRenew !== null ? (
@@ -222,7 +222,7 @@ export default function AccountScreen() {
               ) : (
                 <>
                   <Text style={styles.cardText}>
-                    Upgrade to Executive to book Live and Video Viewings of accommodations before you pay.
+                    Upgrade to Executive for staff-led viewings: a TalcTech staff member visits a place and shows it to you, in person or by video, before you pay for a stay.
                   </Text>
                   <Pressable style={styles.primaryButton} onPress={() => router.push('/(customer)/upgrade')}>
                     <Text style={styles.primaryButtonText}>Upgrade to Executive</Text>
@@ -346,6 +346,10 @@ export default function AccountScreen() {
 
         <Pressable style={styles.logoutButton} onPress={signOut}>
           <Text style={styles.logoutText}>Log out</Text>
+        </Pressable>
+
+        <Pressable style={styles.deleteLink} onPress={() => router.push('/delete-account')}>
+          <Text style={styles.deleteLinkText}>Delete my account</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -511,6 +515,15 @@ const styles = StyleSheet.create({
     marginTop: 36,
     alignItems: 'center',
     paddingVertical: 12,
+  },
+  deleteLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  deleteLinkText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
   logoutText: {
     color: colors.danger,
