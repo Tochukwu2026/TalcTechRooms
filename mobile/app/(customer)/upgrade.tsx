@@ -89,7 +89,7 @@ export default function UpgradeScreen() {
       setUpgraded(true);
     } catch (err) {
       if (err instanceof ApiError && err.body?.status === 'payment_failed') {
-        setPaymentError('Payment was not successful. You have not been charged for an upgrade. Please try again.');
+        setPaymentError('Payment was not successful. You have not been charged for Executive. Please try again.');
       } else if (err instanceof ApiError) {
         setPaymentError(err.message);
       } else {
@@ -152,7 +152,7 @@ export default function UpgradeScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{isSignup ? 'Complete your Executive sign-up' : 'Upgrade to Executive'}</Text>
+        <Text style={styles.title}>{isSignup ? 'Complete your Executive sign-up' : 'Join Executive viewings'}</Text>
         <Text style={styles.subtitle}>
           Executive is a membership for staff-led viewings: a TalcTech staff member visits a place for you and shows it to you, in person (Live) or by video (Video), before you pay for a stay. Your card is charged now for the first month,
           then renews automatically every month. You can switch renewal off any time in Account - you then go back to a

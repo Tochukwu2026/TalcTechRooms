@@ -222,10 +222,10 @@ export default function AccountScreen() {
               ) : (
                 <>
                   <Text style={styles.cardText}>
-                    Upgrade to Executive for staff-led viewings: a TalcTech staff member visits a place and shows it to you, in person or by video, before you pay for a stay.
+                    Join Executive for staff-led viewings: a TalcTech staff member visits a place and shows it to you, in person or by video, before you pay for a stay.
                   </Text>
                   <Pressable style={styles.primaryButton} onPress={() => router.push('/(customer)/upgrade')}>
-                    <Text style={styles.primaryButtonText}>Upgrade to Executive</Text>
+                    <Text style={styles.primaryButtonText}>Join Executive viewings</Text>
                   </Pressable>
                 </>
               )}

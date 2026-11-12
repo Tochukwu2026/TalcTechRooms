@@ -10,17 +10,20 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.talctech.rooms"
+      "bundleIdentifier": "com.talctechrooms"
     },
     "android": {
-      "package": "com.talctech.rooms",
+      "package": "com.talctechrooms",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -33,7 +36,8 @@
         "expo-image-picker",
         {
           "photosPermission": "TalcTech Rooms needs access to your photos so you can add pictures of your accommodation.",
-          "cameraPermission": "TalcTech Rooms needs access to your camera so you can photograph your accommodation."
+          "cameraPermission": "TalcTech Rooms needs access to your camera so you can photograph your accommodation.",
+          "microphonePermission": false
         }
       ]
     ],
@@ -41,7 +45,12 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://talctech-rooms-backend-964645423267.africa-south1.run.app"
-    }
+      "apiBaseUrl": "https://talctech-rooms-backend-964645423267.africa-south1.run.app",
+      "router": {},
+      "eas": {
+        "projectId": "e1898a49-3a6c-4846-a01b-f7ea811a586d"
+      }
+    },
+    "owner": "talctech"
   }
 }
